@@ -1,0 +1,6098 @@
+diff -urN u-boot-2018.03/arch/arm/config.mk u-boot-2018.03s/arch/arm/config.mk
+--- u-boot-2018.03/arch/arm/config.mk	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/config.mk	2019-04-16 14:35:29.000000000 +0800
+@@ -103,7 +103,7 @@
+ endif
+ 
+ # needed for relocation
+-LDFLAGS_u-boot += -pie
++#LDFLAGS_u-boot += -pie
+ 
+ #
+ # FIXME: binutils versions < 2.22 have a bug in the assembler where
+@@ -125,7 +125,7 @@
+ 
+ ifneq ($(CONFIG_SPL_BUILD),y)
+ # Check that only R_ARM_RELATIVE relocations are generated.
+-ALL-y += checkarmreloc
++#ALL-y += checkarmreloc
+ # The movt / movw can hardcode 16 bit parts of the addresses in the
+ # instruction. Relocation is not supported for that case, so disable
+ # such usage by requiring word relocations.
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/Makefile u-boot-2018.03s/arch/arm/cpu/arm920t/Makefile
+--- u-boot-2018.03/arch/arm/cpu/arm920t/Makefile	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/Makefile	2019-04-16 11:32:07.000000000 +0800
+@@ -11,7 +11,7 @@
+ 
+ obj-$(CONFIG_EP93XX) += ep93xx/
+ obj-$(CONFIG_IMX) += imx/
+-
++obj-$(CONFIG_S3C24X0) += s3c24x0/
+ # some files can only build in ARM mode
+ 
+ ifdef CONFIG_$(SPL_)SYS_THUMB_BUILD
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/cpu_info.c u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/cpu_info.c
+--- u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/cpu_info.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/cpu_info.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,38 @@
++/*
++ * (C) Copyright 2010
++ * David Mueller <d.mueller@elsoft.ch>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/io.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++typedef ulong (*getfreq)(void);
++
++static const getfreq freq_f[] = {
++	get_FCLK,
++	get_HCLK,
++	get_PCLK,
++};
++
++static const char freq_c[] = { 'F', 'H', 'P' };
++
++int print_cpuinfo(void)
++{
++	int i;
++	char buf[32];
++/* the S3C2400 seems to be lacking a CHIP ID register */
++#ifndef CONFIG_S3C2400
++	ulong cpuid;
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++
++	cpuid = readl(&gpio->gstatus1);
++	printf("CPUID: %8lX\n", cpuid);
++#endif
++	for (i = 0; i < ARRAY_SIZE(freq_f); i++)
++		printf("%cCLK: %8s MHz\n", freq_c[i], strmhz(buf, freq_f[i]()));
++
++	return 0;
++}
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/interrupts.c u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/interrupts.c
+--- u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/interrupts.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/interrupts.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,26 @@
++/*
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Marius Groeger <mgroeger@sysgo.de>
++ *
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Alex Zuepke <azu@sysgo.de>
++ *
++ * (C) Copyright 2002
++ * Gary Jennejohn, DENX Software Engineering, <gj@denx.de>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++
++#include <asm/arch/s3c24x0_cpu.h>
++#include <asm/proc-armv/ptrace.h>
++
++void do_irq (struct pt_regs *pt_regs)
++{
++	struct s3c24x0_interrupt *irq = s3c24x0_get_base_interrupt();
++	u_int32_t intpnd = readl(&irq->INTPND);
++
++}
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/Makefile u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/Makefile
+--- u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/Makefile	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/Makefile	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,11 @@
++#
++# (C) Copyright 2000-2006
++# Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++obj-$(CONFIG_USE_IRQ) += interrupts.o
++obj-$(CONFIG_DISPLAY_CPUINFO)	+= cpu_info.o
++obj-y	+= speed.o
++obj-y	+= timer.o
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/speed.c u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/speed.c
+--- u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/speed.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/speed.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,102 @@
++/*
++ * (C) Copyright 2001-2004
++ * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++ *
++ * (C) Copyright 2002
++ * David Mueller, ELSOFT AG, d.mueller@elsoft.ch
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++/* This code should work for both the S3C2400 and the S3C2410
++ * as they seem to have the same PLL and clock machinery inside.
++ * The different address mapping is handled by the s3c24xx.h files below.
++ */
++
++#include <common.h>
++#ifdef CONFIG_S3C24X0
++
++#include <asm/io.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++#define MPLL 0
++#define UPLL 1
++
++/* ------------------------------------------------------------------------- */
++/* NOTE: This describes the proper use of this file.
++ *
++ * CONFIG_SYS_CLK_FREQ should be defined as the input frequency of the PLL.
++ *
++ * get_FCLK(), get_HCLK(), get_PCLK() and get_UCLK() return the clock of
++ * the specified bus in HZ.
++ */
++/* ------------------------------------------------------------------------- */
++
++static ulong get_PLLCLK(int pllreg)
++{
++	struct s3c24x0_clock_power *clk_power = s3c24x0_get_base_clock_power();
++	ulong r, m, p, s;
++
++	if (pllreg == MPLL)
++		r = readl(&clk_power->mpllcon);
++	else if (pllreg == UPLL)
++		r = readl(&clk_power->upllcon);
++	else
++		hang();
++
++	m = ((r & 0xFF000) >> 12) + 8;
++	p = ((r & 0x003F0) >> 4) + 2;
++	s = r & 0x3;
++
++#if defined(CONFIG_S3C2440)
++	if (pllreg == MPLL)
++		return 2 * m * (CONFIG_SYS_CLK_FREQ / (p << s));
++#endif
++	return (CONFIG_SYS_CLK_FREQ * m) / (p << s);
++
++}
++
++/* return FCLK frequency */
++ulong get_FCLK(void)
++{
++	return get_PLLCLK(MPLL);
++}
++
++/* return HCLK frequency */
++ulong get_HCLK(void)
++{
++	struct s3c24x0_clock_power *clk_power = s3c24x0_get_base_clock_power();
++#ifdef CONFIG_S3C2440
++	switch (readl(&clk_power->clkdivn) & 0x6) {
++	default:
++	case 0:
++		return get_FCLK();
++	case 2:
++		return get_FCLK() / 2;
++	case 4:
++		return (readl(&clk_power->camdivn) & (1 << 9)) ?
++			get_FCLK() / 8 : get_FCLK() / 4;
++	case 6:
++		return (readl(&clk_power->camdivn) & (1 << 8)) ?
++			get_FCLK() / 6 : get_FCLK() / 3;
++	}
++#else
++	return (readl(&clk_power->clkdivn) & 2) ? get_FCLK() / 2 : get_FCLK();
++#endif
++}
++
++/* return PCLK frequency */
++ulong get_PCLK(void)
++{
++	struct s3c24x0_clock_power *clk_power = s3c24x0_get_base_clock_power();
++
++	return (readl(&clk_power->clkdivn) & 1) ? get_HCLK() / 2 : get_HCLK();
++}
++
++/* return UCLK frequency */
++ulong get_UCLK(void)
++{
++	return get_PLLCLK(UPLL);
++}
++
++#endif /* CONFIG_S3C24X0 */
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/timer.c u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/timer.c
+--- u-boot-2018.03/arch/arm/cpu/arm920t/s3c24x0/timer.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/s3c24x0/timer.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,160 @@
++/*
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Marius Groeger <mgroeger@sysgo.de>
++ *
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Alex Zuepke <azu@sysgo.de>
++ *
++ * (C) Copyright 2002
++ * Gary Jennejohn, DENX Software Engineering, <garyj@denx.de>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#ifdef CONFIG_S3C24X0
++
++#include <asm/io.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++int timer_init(void)
++{
++	struct s3c24x0_timers *timers = s3c24x0_get_base_timers();
++	ulong tmr;
++
++	/* use PWM Timer 4 because it has no output */
++	/* prescaler for Timer 4 is 16 */
++	writel(0x0f00, &timers->tcfg0);
++	if (gd->arch.tbu == 0) {
++		/*
++		 * for 10 ms clock period @ PCLK with 4 bit divider = 1/2
++		 * (default) and prescaler = 16. Should be 10390
++		 * @33.25MHz and 15625 @ 50 MHz
++		 */
++		gd->arch.tbu = get_PCLK() / (2 * 16 * 100);
++		gd->arch.timer_rate_hz = get_PCLK() / (2 * 16);
++	}
++	/* load value for 10 ms timeout */
++	writel(gd->arch.tbu, &timers->tcntb4);
++	/* auto load, manual update of timer 4 */
++	tmr = (readl(&timers->tcon) & ~0x0700000) | 0x0600000;
++	writel(tmr, &timers->tcon);
++	/* auto load, start timer 4 */
++	tmr = (tmr & ~0x0700000) | 0x0500000;
++	writel(tmr, &timers->tcon);
++	gd->arch.lastinc = 0;
++	gd->arch.tbl = 0;
++
++	return 0;
++}
++
++/*
++ * timer without interrupts
++ */
++ulong get_timer(ulong base)
++{
++	return get_timer_masked() - base;
++}
++
++void __udelay (unsigned long usec)
++{
++	ulong tmo;
++	ulong start = get_ticks();
++
++	tmo = usec / 1000;
++	tmo *= (gd->arch.tbu * 100);
++	tmo /= 1000;
++
++	while ((ulong) (get_ticks() - start) < tmo)
++		/*NOP*/;
++}
++
++ulong get_timer_masked(void)
++{
++	ulong tmr = get_ticks();
++
++	return tmr / (gd->arch.timer_rate_hz / CONFIG_SYS_HZ);
++}
++
++void udelay_masked(unsigned long usec)
++{
++	ulong tmo;
++	ulong endtime;
++	signed long diff;
++
++	if (usec >= 1000) {
++		tmo = usec / 1000;
++		tmo *= (gd->arch.tbu * 100);
++		tmo /= 1000;
++	} else {
++		tmo = usec * (gd->arch.tbu * 100);
++		tmo /= (1000 * 1000);
++	}
++
++	endtime = get_ticks() + tmo;
++
++	do {
++		ulong now = get_ticks();
++		diff = endtime - now;
++	} while (diff >= 0);
++}
++
++/*
++ * This function is derived from PowerPC code (read timebase as long long).
++ * On ARM it just returns the timer value.
++ */
++unsigned long long get_ticks(void)
++{
++	struct s3c24x0_timers *timers = s3c24x0_get_base_timers();
++	ulong now = readl(&timers->tcnto4) & 0xffff;
++
++	if (gd->arch.lastinc >= now) {
++		/* normal mode */
++		gd->arch.tbl += gd->arch.lastinc - now;
++	} else {
++		/* we have an overflow ... */
++		gd->arch.tbl += gd->arch.lastinc + gd->arch.tbu - now;
++	}
++	gd->arch.lastinc = now;
++
++	return gd->arch.tbl;
++}
++
++/*
++ * This function is derived from PowerPC code (timebase clock frequency).
++ * On ARM it returns the number of timer ticks per second.
++ */
++ulong get_tbclk(void)
++{
++	return CONFIG_SYS_HZ;
++}
++
++/*
++ * reset the cpu by setting up the watchdog timer and let him time out
++ */
++void reset_cpu(ulong ignored)
++{
++	struct s3c24x0_watchdog *watchdog;
++
++	watchdog = s3c24x0_get_base_watchdog();
++
++	/* Disable watchdog */
++	writel(0x0000, &watchdog->wtcon);
++
++	/* Initialize watchdog timer count register */
++	writel(0x0001, &watchdog->wtcnt);
++
++	/* Enable watchdog timer; assert reset at timer timeout */
++	writel(0x0021, &watchdog->wtcon);
++
++	while (1)
++		/* loop forever and wait for reset to happen */;
++
++	/*NOTREACHED*/
++}
++
++#endif /* CONFIG_S3C24X0 */
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/start.S u-boot-2018.03s/arch/arm/cpu/arm920t/start.S
+--- u-boot-2018.03/arch/arm/cpu/arm920t/start.S	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/start.S	2019-04-25 01:37:14.197004023 +0800
+@@ -1,13 +1,4 @@
+-/*
+- *  armboot - Startup Code for ARM920 CPU-core
+- *
+- *  Copyright (c) 2001	Marius Gröger <mag@sysgo.de>
+- *  Copyright (c) 2002	Alex Züpke <azu@sysgo.de>
+- *  Copyright (c) 2002	Gary Jennejohn <garyj@denx.de>
+- *
+- * SPDX-License-Identifier:	GPL-2.0+
+- */
+-
++/* 头文件包含 */
+ #include <asm-offsets.h>
+ #include <common.h>
+ #include <config.h>
+@@ -25,47 +16,100 @@
+  *************************************************************************
+  */
+ 
+-	.globl	reset
++    .globl    reset
+ 
+ reset:
+-	/*
+-	 * set the cpu to SVC32 mode
+-	 */
+-	mrs	r0, cpsr
+-	bic	r0, r0, #0x1f
+-	orr	r0, r0, #0xd3
+-	msr	cpsr, r0
+-
+-#if	defined(CONFIG_AT91RM9200DK) || defined(CONFIG_AT91RM9200EK)
+-	/*
+-	 * relocate exception table
+-	 */
+-	ldr	r0, =_start
+-	ldr	r1, =0x0
+-	mov	r2, #16
++    /*
++     * set the cpu to SVC32 mode
++     * 将 CPU 设置为管理员（SVC）模式
++     */
++    mrs    r0, cpsr        /* 将状态寄存器的内容传送至通用寄存器,将CPSR中的内容传送至R0 */
++    bic    r0, r0, #0x1f   /* 位清除指令 将R0最低5位清零，其余位不变 工作模式位清零 */
++    orr    r0, r0, #0xd3   /* 工作模式位设置为“10011”（管理模式），并将中断禁止位和快中断禁止位置1 "1101 0011" 指令用于在两个操作数上进行逻辑或运算，并把结果放置到目的寄存器中 */
++    msr    cpsr, r0        /* 将通用寄存器的内容传送至状态寄存器,将中的内容R0传送至CPSR */
++
++#if    defined(CONFIG_AT91RM9200DK) || defined(CONFIG_AT91RM9200EK)
++    /*
++     * relocate exception table
++     */
++    ldr    r0, =_start
++    ldr    r1, =0x0
++    mov    r2, #16
+ copyex:
+-	subs	r2, r2, #1
+-	ldr	r3, [r0], #4
+-	str	r3, [r1], #4
+-	bne	copyex
++    subs    r2, r2, #1
++    ldr    r3, [r0], #4
++    str    r3, [r1], #4
++    bne    copyex
+ #endif
+ 
+-	/*
+-	 * we do sys-critical inits only at reboot,
+-	 * not when booting from ram!
+-	 */
++#ifdef CONFIG_S3C24X0    /* turn off the watchdog */
++/* JZ2440中未定义 */
++#if defined(CONFIG_S3C2400)
++#define pWTCON    0x15300000  /* 看门狗寄存器 */
++#define INTMSK    0x14400008    /* Interrupt-Controller base addresses */
++#define CLKDIVN    0x14800014    /* clock divisor register */
++#else    /* 定义控制寄存器地址 */
++#define pWTCON    0x53000000    /* 看门狗地寄存器地址 */
++#define INTMSK    0x4A000008    /* Interrupt-Controller base addresses */
++#define INTSUBMSK    0x4A00001C    /* 中断掩码 */
++#define CLKDIVN    0x4C000014    /* clock divisor register */
++#define S3C2440_MPLL_400MHZ    ((0x5c<<12)|(0x01<<4)|(0x01))
++#endif  /* end CONFIG_S3C2440 */
++
++    /* 关闭看门狗 */    
++    ldr    r0, =pWTCON                
++    /* r0中存放看门狗寄存器地址 */    
++    mov    r1, #0x0                /* 将立即数0存放到r1中，r1 = 0x0 */    
++    str    r1, [r0]                /* 将r1中的值存放到以r0中的值为地址的存储单元中，即 pwTCON = 0 */
++    
++    /*     
++     * mask all IRQs by setting all bits in the INTMR - default     
++     * 屏蔽中断     */    
++    mov    r1, #0xffffffff            /* 将立即数 0xffffffff 存放到r1中*/    
++    ldr    r0, =INTMSK             /* r0中存放中断控制寄存器基地址 */    
++    str    r1, [r0]                /* 将r1中的值存放到以r0中的值为地址的存储单元中，即 INTMSK = 0xffffffff */
++#if defined(CONFIG_S3C2440)    
++    ldr    r1, =0x7fff    
++    ldr    r0, =INTSUBMSK    
++    str    r1, [r0]
++    
++    ldr    r0, =0x4c000014
++    mov    r1,#0x05
++    str    r1,[r0]
++    mrc    p15,0,r1,c1,c0,0
++    orr    r1,r1,#0xc0000000
++    mcr    p15,0,r1,c1,c0,0
++    ldr    r0,=0x4c000004
++    ldr    r1,=S3C2440_MPLL_400MHZ
++    str    r1,[r0]
++
++    mov    r0,#0x200
++1:  subs   r0,r0,#1
++    bne    1b
++    #mrc    p15,0,r0,c1,c0,0
++    #orr    r0,r0,#(1<<12)
++    #mcr    p15,0,r0,c1,c0,0    
++#endif  /* end CONFIG_S3C2440 */
++#endif    /* end CONFIG_S3C24X0 */
++
++
++    /*
++     * we do sys-critical inits only at reboot,
++     * not when booting from ram!
++     * 未从 ram 启动的时候，所做的CPU 关键初始化工作
++     */
+ #ifndef CONFIG_SKIP_LOWLEVEL_INIT
+-	bl	cpu_init_crit
++    bl    cpu_init_crit       /* CPU 关键初始化 */
+ #endif
+ 
+-	bl	_main
++    bl    _main           /* 跳转到 _main 开始执行，进行初始化C环境 和进行第二阶段 */
+ 
+ /*------------------------------------------------------------------------------*/
+ 
+-	.globl	c_runtime_cpu_setup
++    .globl    c_runtime_cpu_setup
+ c_runtime_cpu_setup:
+ 
+-	mov	pc, lr
++    mov    pc, lr
+ 
+ /*
+  *************************************************************************
+@@ -81,33 +125,35 @@
+ 
+ #ifndef CONFIG_SKIP_LOWLEVEL_INIT
+ cpu_init_crit:
+-	/*
+-	 * flush v4 I/D caches
+-	 */
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c7, 0	/* flush v3/v4 cache */
+-	mcr	p15, 0, r0, c8, c7, 0	/* flush v4 TLB */
+-
+-	/*
+-	 * disable MMU stuff and caches
+-	 */
+-	mrc	p15, 0, r0, c1, c0, 0
+-	bic	r0, r0, #0x00002300	@ clear bits 13, 9:8 (--V- --RS)
+-	bic	r0, r0, #0x00000087	@ clear bits 7, 2:0 (B--- -CAM)
+-	orr	r0, r0, #0x00000002	@ set bit 1 (A) Align
+-	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-Cache
+-	mcr	p15, 0, r0, c1, c0, 0
++    /*
++     * flush v4 I/D caches
++     * 刷新L1 cache的icache和dcache
++     */
++    mov    r0, #0                  /* 置零r0通用寄存器 */
++    mcr    p15, 0, r0, c7, c7, 0    /* flush v3/v4 cache 向c7写入0将使ICache与DCache无效 "0"表示省略opcode_2 MCR{<cond>} p15, 0, <Rd>, <CRn>, <CRm>{,<opcode_2>}*/
++    mcr    p15, 0, r0, c8, c7, 0    /* flush v4 TLB MCR{条件} 协处理器编码，协处理器操作码1，源寄存器，目的寄存器1，目的寄存器2，协处理器操作码2 */
++
++    /*
++     * disable MMU stuff and caches
++     * 关闭 MMU 及其 caches
++     */
++    mrc    p15, 0, r0, c1, c0, 0
++    bic    r0, r0, #0x00002300    @ clear bits 13, 9:8 (--V- --RS)
++    bic    r0, r0, #0x00000087    @ clear bits 7, 2:0 (B--- -CAM)
++    orr    r0, r0, #0x00000002    @ set bit 1 (A) Align
++    orr    r0, r0, #0x00001000    @ set bit 12 (I) I-Cache
++    mcr    p15, 0, r0, c1, c0, 0
+ 
+ #ifndef CONFIG_SKIP_LOWLEVEL_INIT_ONLY
+-	/*
+-	 * before relocating, we have to setup RAM timing
+-	 * because memory timing is board-dependend, you will
+-	 * find a lowlevel_init.S in your board directory.
+-	 */
+-	mov	ip, lr
++    /*
++     * before relocating, we have to setup RAM timing
++     * because memory timing is board-dependend, you will
++     * find a lowlevel_init.S in your board directory.
++     */
++    mov    ip, lr          /* 保存当前程序地址到 ip  寄存器 */
+ 
+-	bl	lowlevel_init
+-	mov	lr, ip
++    bl    lowlevel_init   /* 执行 SDRAM 初始化 */
++    mov    lr, ip
+ #endif
+-	mov	pc, lr
++    mov    pc, lr          /* 返回 */
+ #endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+diff -urN u-boot-2018.03/arch/arm/cpu/arm920t/start_s_bak u-boot-2018.03s/arch/arm/cpu/arm920t/start_s_bak
+--- u-boot-2018.03/arch/arm/cpu/arm920t/start_s_bak	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/cpu/arm920t/start_s_bak	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,113 @@
++/*
++ *  armboot - Startup Code for ARM920 CPU-core
++ *
++ *  Copyright (c) 2001	Marius Gröger <mag@sysgo.de>
++ *  Copyright (c) 2002	Alex Züpke <azu@sysgo.de>
++ *  Copyright (c) 2002	Gary Jennejohn <garyj@denx.de>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <asm-offsets.h>
++#include <common.h>
++#include <config.h>
++
++/*
++ *************************************************************************
++ *
++ * Startup Code (called from the ARM reset exception vector)
++ *
++ * do important init only if we don't start from memory!
++ * relocate armboot to ram
++ * setup stack
++ * jump to second stage
++ *
++ *************************************************************************
++ */
++
++	.globl	reset
++
++reset:
++	/*
++	 * set the cpu to SVC32 mode
++	 */
++	mrs	r0, cpsr
++	bic	r0, r0, #0x1f
++	orr	r0, r0, #0xd3
++	msr	cpsr, r0
++
++#if	defined(CONFIG_AT91RM9200DK) || defined(CONFIG_AT91RM9200EK)
++	/*
++	 * relocate exception table
++	 */
++	ldr	r0, =_start
++	ldr	r1, =0x0
++	mov	r2, #16
++copyex:
++	subs	r2, r2, #1
++	ldr	r3, [r0], #4
++	str	r3, [r1], #4
++	bne	copyex
++#endif
++
++	/*
++	 * we do sys-critical inits only at reboot,
++	 * not when booting from ram!
++	 */
++#ifndef CONFIG_SKIP_LOWLEVEL_INIT
++	bl	cpu_init_crit
++#endif
++
++	bl	_main
++
++/*------------------------------------------------------------------------------*/
++
++	.globl	c_runtime_cpu_setup
++c_runtime_cpu_setup:
++
++	mov	pc, lr
++
++/*
++ *************************************************************************
++ *
++ * CPU_init_critical registers
++ *
++ * setup important registers
++ * setup memory timing
++ *
++ *************************************************************************
++ */
++
++
++#ifndef CONFIG_SKIP_LOWLEVEL_INIT
++cpu_init_crit:
++	/*
++	 * flush v4 I/D caches
++	 */
++	mov	r0, #0
++	mcr	p15, 0, r0, c7, c7, 0	/* flush v3/v4 cache */
++	mcr	p15, 0, r0, c8, c7, 0	/* flush v4 TLB */
++
++	/*
++	 * disable MMU stuff and caches
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #0x00002300	@ clear bits 13, 9:8 (--V- --RS)
++	bic	r0, r0, #0x00000087	@ clear bits 7, 2:0 (B--- -CAM)
++	orr	r0, r0, #0x00000002	@ set bit 1 (A) Align
++	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-Cache
++	mcr	p15, 0, r0, c1, c0, 0
++
++#ifndef CONFIG_SKIP_LOWLEVEL_INIT_ONLY
++	/*
++	 * before relocating, we have to setup RAM timing
++	 * because memory timing is board-dependend, you will
++	 * find a lowlevel_init.S in your board directory.
++	 */
++	mov	ip, lr
++
++	bl	lowlevel_init
++	mov	lr, ip
++#endif
++	mov	pc, lr
++#endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/gpio.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/gpio.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/gpio.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/gpio.h	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,155 @@
++/*
++ * Copyright (c) 2012.
++ *
++ * Gabriel Huau <contact@huau-gabriel.fr>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _S3C24X0_GPIO_H_
++#define _S3C24X0_GPIO_H_
++
++enum s3c2440_gpio {
++	GPA0,
++	GPA1,
++	GPA2,
++	GPA3,
++	GPA4,
++	GPA5,
++	GPA6,
++	GPA7,
++	GPA8,
++	GPA9,
++	GPA10,
++	GPA11,
++	GPA12,
++	GPA13,
++	GPA14,
++	GPA15,
++	GPA16,
++	GPA17,
++	GPA18,
++	GPA19,
++	GPA20,
++	GPA21,
++	GPA22,
++	GPA23,
++	GPA24,
++
++	GPB0 = 32,
++	GPB1,
++	GPB2,
++	GPB3,
++	GPB4,
++	GPB5,
++	GPB6,
++	GPB7,
++	GPB8,
++	GPB9,
++	GPB10,
++
++	GPC0 = 64,
++	GPC1,
++	GPC2,
++	GPC3,
++	GPC4,
++	GPC5,
++	GPC6,
++	GPC7,
++	GPC8,
++	GPC9,
++	GPC10,
++	GPC11,
++	GPC12,
++	GPC13,
++	GPC14,
++	GPC15,
++
++	GPD0 = 96,
++	GPD1,
++	GPD2,
++	GPD3,
++	GPD4,
++	GPD5,
++	GPD6,
++	GPD7,
++	GPD8,
++	GPD9,
++	GPD10,
++	GPD11,
++	GPD12,
++	GPD13,
++	GPD14,
++	GPD15,
++
++	GPE0 = 128,
++	GPE1,
++	GPE2,
++	GPE3,
++	GPE4,
++	GPE5,
++	GPE6,
++	GPE7,
++	GPE8,
++	GPE9,
++	GPE10,
++	GPE11,
++	GPE12,
++	GPE13,
++	GPE14,
++	GPE15,
++
++	GPF0 = 160,
++	GPF1,
++	GPF2,
++	GPF3,
++	GPF4,
++	GPF5,
++	GPF6,
++	GPF7,
++
++	GPG0 = 192,
++	GPG1,
++	GPG2,
++	GPG3,
++	GPG4,
++	GPG5,
++	GPG6,
++	GPG7,
++	GPG8,
++	GPG9,
++	GPG10,
++	GPG11,
++	GPG12,
++	GPG13,
++	GPG14,
++	GPG15,
++
++	GPH0 = 224,
++	GPH1,
++	GPH2,
++	GPH3,
++	GPH4,
++	GPH5,
++	GPH6,
++	GPH7,
++	GPH8,
++	GPH9,
++	GPH10,
++
++	GPJ0 = 256,
++	GPJ1,
++	GPJ2,
++	GPJ3,
++	GPJ4,
++	GPJ5,
++	GPJ6,
++	GPJ7,
++	GPJ8,
++	GPJ9,
++	GPJ10,
++	GPJ11,
++	GPJ12,
++};
++
++#endif
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/iomux.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/iomux.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/iomux.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/iomux.h	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,184 @@
++/*
++ * Copyright (c) 2012
++ *
++ * Gabriel Huau <contact@huau-gabriel.fr>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _S3C24X0_IOMUX_H_
++#define _S3C24X0_IOMUX_H_
++
++enum s3c2440_iomux_func {
++	/* PORT A */
++	IOMUXA_ADDR0	= 1,
++	IOMUXA_ADDR16	= (1 << 1),
++	IOMUXA_ADDR17	= (1 << 2),
++	IOMUXA_ADDR18	= (1 << 3),
++	IOMUXA_ADDR19	= (1 << 4),
++	IOMUXA_ADDR20	= (1 << 5),
++	IOMUXA_ADDR21	= (1 << 6),
++	IOMUXA_ADDR22	= (1 << 7),
++	IOMUXA_ADDR23	= (1 << 8),
++	IOMUXA_ADDR24	= (1 << 9),
++	IOMUXA_ADDR25	= (1 << 10),
++	IOMUXA_ADDR26	= (1 << 11),
++	IOMUXA_nGCS1	= (1 << 12),
++	IOMUXA_nGCS2	= (1 << 13),
++	IOMUXA_nGCS3	= (1 << 14),
++	IOMUXA_nGCS4	= (1 << 15),
++	IOMUXA_nGCS5	= (1 << 16),
++	IOMUXA_CLE	= (1 << 17),
++	IOMUXA_ALE	= (1 << 18),
++	IOMUXA_nFWE	= (1 << 19),
++	IOMUXA_nFRE	= (1 << 20),
++	IOMUXA_nRSTOUT	= (1 << 21),
++	IOMUXA_nFCE		= (1 << 22),
++
++	/* PORT B */
++	IOMUXB_nXDREQ0	= (2 << 20),
++	IOMUXB_nXDACK0	= (2 << 18),
++	IOMUXB_nXDREQ1	= (2 << 16),
++	IOMUXB_nXDACK1	= (2 << 14),
++	IOMUXB_nXBREQ	= (2 << 12),
++	IOMUXB_nXBACK	= (2 << 10),
++	IOMUXB_TCLK0	= (2 << 8),
++	IOMUXB_TOUT3	= (2 << 6),
++	IOMUXB_TOUT2	= (2 << 4),
++	IOMUXB_TOUT1	= (2 << 2),
++	IOMUXB_TOUT0	= 2,
++
++	/* PORT C */
++	IOMUXC_VS7	= (2 << 30),
++	IOMUXC_VS6	= (2 << 28),
++	IOMUXC_VS5	= (2 << 26),
++	IOMUXC_VS4	= (2 << 24),
++	IOMUXC_VS3	= (2 << 22),
++	IOMUXC_VS2	= (2 << 20),
++	IOMUXC_VS1	= (2 << 18),
++	IOMUXC_VS0	= (2 << 16),
++	IOMUXC_LCD_LPCREVB	= (2 << 14),
++	IOMUXC_LCD_LPCREV	= (2 << 12),
++	IOMUXC_LCD_LPCOE	= (2 << 10),
++	IOMUXC_VM		= (2 << 8),
++	IOMUXC_VFRAME	= (2 << 6),
++	IOMUXC_VLINE	= (2 << 4),
++	IOMUXC_VCLK		= (2 << 2),
++	IOMUXC_LEND		= 2,
++	IOMUXC_I2SSDI	= (3 << 8),
++
++	/* PORT D */
++	IOMUXD_VS23	= (2 << 30),
++	IOMUXD_VS22	= (2 << 28),
++	IOMUXD_VS21	= (2 << 26),
++	IOMUXD_VS20	= (2 << 24),
++	IOMUXD_VS19	= (2 << 22),
++	IOMUXD_VS18	= (2 << 20),
++	IOMUXD_VS17	= (2 << 18),
++	IOMUXD_VS16	= (2 << 16),
++	IOMUXD_VS15	= (2 << 14),
++	IOMUXD_VS14	= (2 << 12),
++	IOMUXD_VS13	= (2 << 10),
++	IOMUXD_VS12	= (2 << 8),
++	IOMUXD_VS11	= (2 << 6),
++	IOMUXD_VS10	= (2 << 4),
++	IOMUXD_VS9	= (2 << 2),
++	IOMUXD_VS8	= 2,
++	IOMUXD_nSS0	= (3 << 30),
++	IOMUXD_nSS1	= (3 << 28),
++	IOMUXD_SPICLK1	= (3 << 20),
++	IOMUXD_SPIMOSI1	= (3 << 18),
++	IOMUXD_SPIMISO1	= (3 << 16),
++
++	/* PORT E */
++	IOMUXE_IICSDA	= (2 << 30),
++	IOMUXE_IICSCL	= (2 << 28),
++	IOMUXE_SPICLK0	= (2 << 26),
++	IOMUXE_SPIMOSI0	= (2 << 24),
++	IOMUXE_SPIMISO0	= (2 << 22),
++	IOMUXE_SDDAT3	= (2 << 20),
++	IOMUXE_SDDAT2	= (2 << 18),
++	IOMUXE_SDDAT1	= (2 << 16),
++	IOMUXE_SDDAT0	= (2 << 14),
++	IOMUXE_SDCMD	= (2 << 12),
++	IOMUXE_SDCLK	= (2 << 10),
++	IOMUXE_I2SDO	= (2 << 8),
++	IOMUXE_I2SDI	= (2 << 6),
++	IOMUXE_CDCLK	= (2 << 4),
++	IOMUXE_I2SSCLK	= (2 << 2),
++	IOMUXE_I2SLRCK	= 2,
++	IOMUXE_AC_SDATA_OUT	= (3 << 8),
++	IOMUXE_AC_SDATA_IN	= (3 << 6),
++	IOMUXE_AC_nRESET	= (3 << 4),
++	IOMUXE_AC_BIT_CLK	= (3 << 2),
++	IOMUXE_AC_SYNC		= 3,
++
++	/* PORT F */
++	IOMUXF_EINT7	= (2 << 14),
++	IOMUXF_EINT6	= (2 << 12),
++	IOMUXF_EINT5	= (2 << 10),
++	IOMUXF_EINT4	= (2 << 8),
++	IOMUXF_EINT3	= (2 << 6),
++	IOMUXF_EINT2	= (2 << 4),
++	IOMUXF_EINT1	= (2 << 2),
++	IOMUXF_EINT0	= 2,
++
++	/* PORT G */
++	IOMUXG_EINT23	= (2 << 30),
++	IOMUXG_EINT22	= (2 << 28),
++	IOMUXG_EINT21	= (2 << 26),
++	IOMUXG_EINT20	= (2 << 24),
++	IOMUXG_EINT19	= (2 << 22),
++	IOMUXG_EINT18	= (2 << 20),
++	IOMUXG_EINT17	= (2 << 18),
++	IOMUXG_EINT16	= (2 << 16),
++	IOMUXG_EINT15	= (2 << 14),
++	IOMUXG_EINT14	= (2 << 12),
++	IOMUXG_EINT13	= (2 << 10),
++	IOMUXG_EINT12	= (2 << 8),
++	IOMUXG_EINT11	= (2 << 6),
++	IOMUXG_EINT10	= (2 << 4),
++	IOMUXG_EINT9	= (2 << 2),
++	IOMUXG_EINT8	= 2,
++	IOMUXG_TCLK1	= (3 << 22),
++	IOMUXG_nCTS1	= (3 << 20),
++	IOMUXG_nRTS1	= (3 << 18),
++	IOMUXG_SPICLK1	= (3 << 14),
++	IOMUXG_SPIMOSI1	= (3 << 12),
++	IOMUXG_SPIMISO1	= (3 << 10),
++	IOMUXG_LCD_PWRDN	= (3 << 8),
++	IOMUXG_nSS1			= (3 << 6),
++	IOMUXG_nSS0			= (3 << 4),
++
++	/* PORT H */
++	IOMUXH_CLKOUT1	= (2 << 20),
++	IOMUXH_CLKOUT0	= (2 << 18),
++	IOMUXH_UEXTCLK	= (2 << 16),
++	IOMUXH_RXD2		= (2 << 14),
++	IOMUXH_TXD2		= (2 << 12),
++	IOMUXH_RXD1		= (2 << 10),
++	IOMUXH_TXD1		= (2 << 8),
++	IOMUXH_RXD0		= (2 << 6),
++	IOMUXH_TXD0		= (2 << 4),
++	IOMUXH_nRTS0	= (2 << 2),
++	IOMUXH_nCTS0	= 2,
++	IOMUXH_nCTS1	= (3 << 14),
++	IOMUXH_nRTS1	= (3 << 12),
++
++	/* PORT J */
++	IOMUXJ_CAMRESET		= (2 << 24),
++	IOMUXJ_CAMCLKOUT	= (2 << 22),
++	IOMUXJ_CAMHREF		= (2 << 20),
++	IOMUXJ_CAMVSYNC		= (2 << 18),
++	IOMUXJ_CAMPCLK		= (2 << 16),
++	IOMUXJ_CAMDATA7		= (2 << 14),
++	IOMUXJ_CAMDATA6		= (2 << 12),
++	IOMUXJ_CAMDATA5		= (2 << 10),
++	IOMUXJ_CAMDATA4		= (2 << 8),
++	IOMUXJ_CAMDATA3		= (2 << 6),
++	IOMUXJ_CAMDATA2		= (2 << 4),
++	IOMUXJ_CAMDATA1		= (2 << 2),
++	IOMUXJ_CAMDATA0		= 2
++};
++
++#endif
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/memory.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/memory.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/memory.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/memory.h	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,159 @@
++/*
++ * linux/include/asm-arm/arch-s3c2400/memory.h by garyj@denx.de
++ * based on
++ * linux/include/asm-arm/arch-sa1100/memory.h
++ *
++ * Copyright (c) 1999 Nicolas Pitre <nico@visuaide.com>
++ */
++
++#ifndef __ASM_ARCH_MEMORY_H
++#define __ASM_ARCH_MEMORY_H
++
++
++/*
++ * Task size: 3GB
++ */
++#define TASK_SIZE       (0xc0000000UL)
++#define TASK_SIZE_26	(0x04000000UL)
++
++/*
++ * This decides where the kernel will search for a free chunk of vm
++ * space during mmap's.
++ */
++#define TASK_UNMAPPED_BASE (TASK_SIZE / 3)
++
++/*
++ * Page offset: 3GB
++ */
++#define PAGE_OFFSET     (0xc0000000UL)
++
++/*
++ * Physical DRAM offset is 0x0c000000 on the S3C2400
++ */
++#define PHYS_OFFSET	(0x0c000000UL)
++
++/* Modified for S3C2400, by chc, 20010509 */
++#define RAM_IN_BANK_0  32*1024*1024
++#define RAM_IN_BANK_1  0
++#define RAM_IN_BANK_2  0
++#define RAM_IN_BANK_3  0
++
++#define MEM_SIZE  (RAM_IN_BANK_0+RAM_IN_BANK_1+RAM_IN_BANK_2+RAM_IN_BANK_3)
++
++
++/* translation macros */
++#define __virt_to_phys__is_a_macro
++#define __phys_to_virt__is_a_macro
++
++#if (RAM_IN_BANK_1 + RAM_IN_BANK_2 + RAM_IN_BANK_3 == 0)
++
++#define __virt_to_phys(x) ( (x) - PAGE_OFFSET + 0x0c000000 )
++#define __phys_to_virt(x) ( (x) - 0x0c000000 + PAGE_OFFSET )
++
++#elif (RAM_IN_BANK_0 == RAM_IN_BANK_1) && \
++      (RAM_IN_BANK_2 + RAM_IN_BANK_3 == 0)
++
++/* Two identical banks */
++#define __virt_to_phys(x) \
++	  ( ((x) < PAGE_OFFSET+RAM_IN_BANK_0) ? \
++	    ((x) - PAGE_OFFSET + _DRAMBnk0) : \
++	    ((x) - PAGE_OFFSET - RAM_IN_BANK_0 + _DRAMBnk1) )
++#define __phys_to_virt(x) \
++	  ( ((x)&0x07ffffff) + \
++	    (((x)&0x08000000) ? PAGE_OFFSET+RAM_IN_BANK_0 : PAGE_OFFSET) )
++#else
++
++/* It's more efficient for all other cases to use the function call */
++#undef __virt_to_phys__is_a_macro
++#undef __phys_to_virt__is_a_macro
++extern unsigned long __virt_to_phys(unsigned long vpage);
++extern unsigned long __phys_to_virt(unsigned long ppage);
++
++#endif
++
++/*
++ * Virtual view <-> DMA view memory address translations
++ * virt_to_bus: Used to translate the virtual address to an
++ *              address suitable to be passed to set_dma_addr
++ * bus_to_virt: Used to convert an address for DMA operations
++ *              to an address that the kernel can use.
++ *
++ * On the SA1100, bus addresses are equivalent to physical addresses.
++ */
++#define __virt_to_bus__is_a_macro
++#define __virt_to_bus(x)        __virt_to_phys(x)
++#define __bus_to_virt__is_a_macro
++#define __bus_to_virt(x)        __phys_to_virt(x)
++
++
++#ifdef CONFIG_DISCONTIGMEM
++#error "CONFIG_DISCONTIGMEM will not work on S3C2400"
++/*
++ * Because of the wide memory address space between physical RAM banks on the
++ * SA1100, it's much more convenient to use Linux's NUMA support to implement
++ * our memory map representation.  Assuming all memory nodes have equal access
++ * characteristics, we then have generic discontiguous memory support.
++ *
++ * Of course, all this isn't mandatory for SA1100 implementations with only
++ * one used memory bank.  For those, simply undefine CONFIG_DISCONTIGMEM.
++ *
++ * The nodes are matched with the physical memory bank addresses which are
++ * incidentally the same as virtual addresses.
++ *
++ *	node 0:  0xc0000000 - 0xc7ffffff
++ *	node 1:  0xc8000000 - 0xcfffffff
++ *	node 2:  0xd0000000 - 0xd7ffffff
++ *	node 3:  0xd8000000 - 0xdfffffff
++ */
++
++#define NR_NODES	4
++
++/*
++ * Given a kernel address, find the home node of the underlying memory.
++ */
++#define KVADDR_TO_NID(addr) \
++		(((unsigned long)(addr) - 0xc0000000) >> 27)
++
++/*
++ * Given a physical address, convert it to a node id.
++ */
++#define PHYS_TO_NID(addr) KVADDR_TO_NID(__phys_to_virt(addr))
++
++/*
++ * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
++ * and returns the mem_map of that node.
++ */
++#define ADDR_TO_MAPBASE(kaddr) \
++			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))
++
++/*
++ * Given a kaddr, LOCAL_MEM_MAP finds the owning node of the memory
++ * and returns the index corresponding to the appropriate page in the
++ * node's mem_map.
++ */
++#define LOCAL_MAP_NR(kvaddr) \
++	(((unsigned long)(kvaddr) & 0x07ffffff) >> PAGE_SHIFT)
++
++/*
++ * Given a kaddr, virt_to_page returns a pointer to the corresponding
++ * mem_map entry.
++ */
++#define virt_to_page(kaddr) \
++	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
++
++/*
++ * VALID_PAGE returns a non-zero value if given page pointer is valid.
++ * This assumes all node's mem_maps are stored within the node they refer to.
++ */
++#define VALID_PAGE(page) \
++({ unsigned int node = KVADDR_TO_NID(page); \
++   ( (node < NR_NODES) && \
++     ((unsigned)((page) - NODE_MEM_MAP(node)) < NODE_DATA(node)->node_size) ); \
++})
++
++#else
++
++#define PHYS_TO_NID(addr)	(0)
++
++#endif
++#endif /* __ASM_ARCH_MEMORY_H */
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2400.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2400.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2400.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2400.h	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,136 @@
++/*
++ * (C) Copyright 2003
++ * David Müller ELSOFT AG Switzerland. d.mueller@elsoft.ch
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++/************************************************
++ * NAME	    : s3c2400.h
++ * Version  : 31.3.2003
++ *
++ * Based on S3C2400X User's manual Rev 1.1
++ ************************************************/
++
++#ifndef __S3C2400_H__
++#define __S3C2400_H__
++
++#define S3C24X0_UART_CHANNELS	2
++#define S3C24X0_SPI_CHANNELS	1
++#define PALETTE			(0x14A00400)	/* SJS */
++
++enum s3c24x0_uarts_nr {
++	S3C24X0_UART0,
++	S3C24X0_UART1,
++};
++
++/*S3C2400 device base addresses */
++#define S3C24X0_MEMCTL_BASE		0x14000000
++#define S3C24X0_USB_HOST_BASE		0x14200000
++#define S3C24X0_INTERRUPT_BASE		0x14400000
++#define S3C24X0_DMA_BASE		0x14600000
++#define S3C24X0_CLOCK_POWER_BASE	0x14800000
++#define S3C24X0_LCD_BASE		0x14A00000
++#define S3C24X0_UART_BASE		0x15000000
++#define S3C24X0_TIMER_BASE		0x15100000
++#define S3C24X0_USB_DEVICE_BASE		0x15200140
++#define S3C24X0_WATCHDOG_BASE		0x15300000
++#define S3C24X0_I2C_BASE		0x15400000
++#define S3C24X0_I2S_BASE		0x15508000
++#define S3C24X0_GPIO_BASE		0x15600000
++#define S3C24X0_RTC_BASE		0x15700000
++#define S3C24X0_ADC_BASE		0x15800000
++#define S3C24X0_SPI_BASE		0x15900000
++#define S3C2400_MMC_BASE		0x15A00000
++
++/* include common stuff */
++#include <asm/arch/s3c24x0.h>
++
++
++static inline struct s3c24x0_memctl *s3c24x0_get_base_memctl(void)
++{
++	return (struct s3c24x0_memctl *)S3C24X0_MEMCTL_BASE;
++}
++
++static inline struct s3c24x0_usb_host *s3c24x0_get_base_usb_host(void)
++{
++	return (struct s3c24x0_usb_host *)S3C24X0_USB_HOST_BASE;
++}
++
++static inline struct s3c24x0_interrupt *s3c24x0_get_base_interrupt(void)
++{
++	return (struct s3c24x0_interrupt *)S3C24X0_INTERRUPT_BASE;
++}
++
++static inline struct s3c24x0_dmas *s3c24x0_get_base_dmas(void)
++{
++	return (struct s3c24x0_dmas *)S3C24X0_DMA_BASE;
++}
++
++static inline struct s3c24x0_clock_power *s3c24x0_get_base_clock_power(void)
++{
++	return (struct s3c24x0_clock_power *)S3C24X0_CLOCK_POWER_BASE;
++}
++
++static inline struct s3c24x0_lcd *s3c24x0_get_base_lcd(void)
++{
++	return (struct s3c24x0_lcd *)S3C24X0_LCD_BASE;
++}
++
++static inline struct s3c24x0_uart
++	*s3c24x0_get_base_uart(enum s3c24x0_uarts_nr n)
++{
++	return (struct s3c24x0_uart *)(S3C24X0_UART_BASE + (n * 0x4000));
++}
++
++static inline struct s3c24x0_timers *s3c24x0_get_base_timers(void)
++{
++	return (struct s3c24x0_timers *)S3C24X0_TIMER_BASE;
++}
++
++static inline struct s3c24x0_usb_device *s3c24x0_get_base_usb_device(void)
++{
++	return (struct s3c24x0_usb_device *)S3C24X0_USB_DEVICE_BASE;
++}
++
++static inline struct s3c24x0_watchdog *s3c24x0_get_base_watchdog(void)
++{
++	return (struct s3c24x0_watchdog *)S3C24X0_WATCHDOG_BASE;
++}
++
++static inline struct s3c24x0_i2c *s3c24x0_get_base_i2c(void)
++{
++	return (struct s3c24x0_i2c *)S3C24X0_I2C_BASE;
++}
++
++static inline struct s3c24x0_i2s *s3c24x0_get_base_i2s(void)
++{
++	return (struct s3c24x0_i2s *)S3C24X0_I2S_BASE;
++}
++
++static inline struct s3c24x0_gpio *s3c24x0_get_base_gpio(void)
++{
++	return (struct s3c24x0_gpio *)S3C24X0_GPIO_BASE;
++}
++
++static inline struct s3c24x0_rtc *s3c24x0_get_base_rtc(void)
++{
++	return (struct s3c24x0_rtc *)S3C24X0_RTC_BASE;
++}
++
++static inline struct s3c2400_adc *s3c2400_get_base_adc(void)
++{
++	return (struct s3c2400_adc *)S3C24X0_ADC_BASE;
++}
++
++static inline struct s3c24x0_spi *s3c24x0_get_base_spi(void)
++{
++	return (struct s3c24x0_spi *)S3C24X0_SPI_BASE;
++}
++
++static inline struct s3c2400_mmc *s3c2400_get_base_mmc(void)
++{
++	return (struct s3c2400_mmc *)S3C2400_MMC_BASE;
++}
++
++#endif /*__S3C2400_H__*/
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2410.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2410.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2410.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2410.h	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,147 @@
++/*
++ * (C) Copyright 2003
++ * David Müller ELSOFT AG Switzerland. d.mueller@elsoft.ch
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++/************************************************
++ * NAME	    : s3c2410.h
++ * Version  : 31.3.2003
++ *
++ * Based on S3C2410X User's manual Rev 1.1
++ ************************************************/
++
++#ifndef __S3C2410_H__
++#define __S3C2410_H__
++
++#define S3C24X0_UART_CHANNELS	3
++#define S3C24X0_SPI_CHANNELS	2
++
++/* S3C2410 only supports 512 Byte HW ECC */
++#define S3C2410_ECCSIZE		512
++#define S3C2410_ECCBYTES	3
++
++enum s3c24x0_uarts_nr {
++	S3C24X0_UART0,
++	S3C24X0_UART1,
++	S3C24X0_UART2
++};
++
++/* S3C2410 device base addresses */
++#define S3C24X0_MEMCTL_BASE		0x48000000
++#define S3C24X0_USB_HOST_BASE		0x49000000
++#define S3C24X0_INTERRUPT_BASE		0x4A000000
++#define S3C24X0_DMA_BASE		0x4B000000
++#define S3C24X0_CLOCK_POWER_BASE	0x4C000000
++#define S3C24X0_LCD_BASE		0x4D000000
++#define S3C2410_NAND_BASE		0x4E000000
++#define S3C24X0_UART_BASE		0x50000000
++#define S3C24X0_TIMER_BASE		0x51000000
++#define S3C24X0_USB_DEVICE_BASE		0x52000140
++#define S3C24X0_WATCHDOG_BASE		0x53000000
++#define S3C24X0_I2C_BASE		0x54000000
++#define S3C24X0_I2S_BASE		0x55000000
++#define S3C24X0_GPIO_BASE		0x56000000
++#define S3C24X0_RTC_BASE		0x57000000
++#define S3C2410_ADC_BASE		0x58000000
++#define S3C24X0_SPI_BASE		0x59000000
++#define S3C2410_SDI_BASE		0x5A000000
++
++
++/* include common stuff */
++#include <asm/arch/s3c24x0.h>
++
++
++static inline struct s3c24x0_memctl *s3c24x0_get_base_memctl(void)
++{
++	return (struct s3c24x0_memctl *)S3C24X0_MEMCTL_BASE;
++}
++
++static inline struct s3c24x0_usb_host *s3c24x0_get_base_usb_host(void)
++{
++	return (struct s3c24x0_usb_host *)S3C24X0_USB_HOST_BASE;
++}
++
++static inline struct s3c24x0_interrupt *s3c24x0_get_base_interrupt(void)
++{
++	return (struct s3c24x0_interrupt *)S3C24X0_INTERRUPT_BASE;
++}
++
++static inline struct s3c24x0_dmas *s3c24x0_get_base_dmas(void)
++{
++	return (struct s3c24x0_dmas *)S3C24X0_DMA_BASE;
++}
++
++static inline struct s3c24x0_clock_power *s3c24x0_get_base_clock_power(void)
++{
++	return (struct s3c24x0_clock_power *)S3C24X0_CLOCK_POWER_BASE;
++}
++
++static inline struct s3c24x0_lcd *s3c24x0_get_base_lcd(void)
++{
++	return (struct s3c24x0_lcd *)S3C24X0_LCD_BASE;
++}
++
++static inline struct s3c24x0_nand *s3c24x0_get_base_nand(void)
++{
++	return (struct s3c24x0_nand *)S3C2410_NAND_BASE;
++}
++
++static inline struct s3c24x0_uart
++	*s3c24x0_get_base_uart(enum s3c24x0_uarts_nr n)
++{
++	return (struct s3c24x0_uart *)(S3C24X0_UART_BASE + (n * 0x4000));
++}
++
++static inline struct s3c24x0_timers *s3c24x0_get_base_timers(void)
++{
++	return (struct s3c24x0_timers *)S3C24X0_TIMER_BASE;
++}
++
++static inline struct s3c24x0_usb_device *s3c24x0_get_base_usb_device(void)
++{
++	return (struct s3c24x0_usb_device *)S3C24X0_USB_DEVICE_BASE;
++}
++
++static inline struct s3c24x0_watchdog *s3c24x0_get_base_watchdog(void)
++{
++	return (struct s3c24x0_watchdog *)S3C24X0_WATCHDOG_BASE;
++}
++
++static inline struct s3c24x0_i2c *s3c24x0_get_base_i2c(void)
++{
++	return (struct s3c24x0_i2c *)S3C24X0_I2C_BASE;
++}
++
++static inline struct s3c24x0_i2s *s3c24x0_get_base_i2s(void)
++{
++	return (struct s3c24x0_i2s *)S3C24X0_I2S_BASE;
++}
++
++static inline struct s3c24x0_gpio *s3c24x0_get_base_gpio(void)
++{
++	return (struct s3c24x0_gpio *)S3C24X0_GPIO_BASE;
++}
++
++static inline struct s3c24x0_rtc *s3c24x0_get_base_rtc(void)
++{
++	return (struct s3c24x0_rtc *)S3C24X0_RTC_BASE;
++}
++
++static inline struct s3c2410_adc *s3c2410_get_base_adc(void)
++{
++	return (struct s3c2410_adc *)S3C2410_ADC_BASE;
++}
++
++static inline struct s3c24x0_spi *s3c24x0_get_base_spi(void)
++{
++	return (struct s3c24x0_spi *)S3C24X0_SPI_BASE;
++}
++
++static inline struct s3c24x0_sdi *s3c24x0_get_base_sdi(void)
++{
++	return (struct s3c24x0_sdi *)S3C2410_SDI_BASE;
++}
++
++#endif /*__S3C2410_H__*/
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2440.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2440.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c2440.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c2440.h	2019-05-06 00:24:28.487805123 +0800
+@@ -0,0 +1,161 @@
++/*
++ * (C) Copyright 2003
++ * David Mueller ELSOFT AG Switzerland. d.mueller@elsoft.ch
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++/************************************************
++ * NAME	    : s3c2440.h
++ * Version  : 31.3.2003
++ *
++ * Based on S3C2440 User's manual Rev x.x
++ ************************************************/
++
++#ifndef __S3C2440_H__
++#define __S3C2440_H__
++
++#define S3C24X0_UART_CHANNELS	3
++#define S3C24X0_SPI_CHANNELS	2
++
++/* S3C2440 only supports 512 Byte HW ECC */
++#define S3C2440_ECCSIZE		512
++#define S3C2440_ECCBYTES	3
++
++enum s3c24x0_uarts_nr {
++	S3C24X0_UART0,
++	S3C24X0_UART1,
++	S3C24X0_UART2
++};
++
++/* S3C2440 device base addresses */
++#define S3C24X0_MEMCTL_BASE		0x48000000
++#define S3C24X0_USB_HOST_BASE		0x49000000
++#define S3C24X0_INTERRUPT_BASE		0x4A000000
++#define S3C24X0_DMA_BASE		0x4B000000
++#define S3C24X0_CLOCK_POWER_BASE	0x4C000000
++#define S3C24X0_LCD_BASE		0x4D000000
++#define S3C2440_NAND_BASE		0x4E000000
++#define S3C24X0_UART_BASE		0x50000000
++#define S3C24X0_TIMER_BASE		0x51000000
++#define S3C24X0_USB_DEVICE_BASE		0x52000140
++#define S3C24X0_WATCHDOG_BASE		0x53000000
++#define S3C24X0_I2C_BASE		0x54000000
++#define S3C24X0_I2S_BASE		0x55000000
++#define S3C24X0_GPIO_BASE		0x56000000
++#define S3C24X0_RTC_BASE		0x57000000
++#define S3C2440_ADC_BASE		0x58000000
++#define S3C24X0_SPI_BASE		0x59000000
++#define S3C2440_SDI_BASE		0x5A000000
++
++/* include common stuff */
++#include <asm/arch/s3c24x0.h>
++
++static inline struct s3c24x0_memctl *s3c24x0_get_base_memctl(void)
++{
++	return (struct s3c24x0_memctl *)S3C24X0_MEMCTL_BASE;
++}
++
++static inline struct s3c24x0_usb_host *s3c24x0_get_base_usb_host(void)
++{
++	return (struct s3c24x0_usb_host *)S3C24X0_USB_HOST_BASE;
++}
++
++static inline struct s3c24x0_interrupt *s3c24x0_get_base_interrupt(void)
++{
++	return (struct s3c24x0_interrupt *)S3C24X0_INTERRUPT_BASE;
++}
++
++static inline struct s3c24x0_dmas *s3c24x0_get_base_dmas(void)
++{
++	return (struct s3c24x0_dmas *)S3C24X0_DMA_BASE;
++}
++
++static inline struct s3c24x0_clock_power *s3c24x0_get_base_clock_power(void)
++{
++	return (struct s3c24x0_clock_power *)S3C24X0_CLOCK_POWER_BASE;
++}
++
++static inline struct s3c24x0_lcd *s3c24x0_get_base_lcd(void)
++{
++	return (struct s3c24x0_lcd *)S3C24X0_LCD_BASE;
++}
++
++static inline struct s3c2440_nand *s3c2440_get_base_nand(void)
++{
++	return (struct s3c2440_nand *)S3C2440_NAND_BASE;
++}
++
++static inline struct s3c24x0_uart
++	*s3c24x0_get_base_uart(enum s3c24x0_uarts_nr n)
++{
++	return (struct s3c24x0_uart *)(S3C24X0_UART_BASE + (n * 0x4000));
++}
++
++static inline struct s3c24x0_timers *s3c24x0_get_base_timers(void)
++{
++	return (struct s3c24x0_timers *)S3C24X0_TIMER_BASE;
++}
++
++static inline struct s3c24x0_usb_device *s3c24x0_get_base_usb_device(void)
++{
++	return (struct s3c24x0_usb_device *)S3C24X0_USB_DEVICE_BASE;
++}
++
++static inline struct s3c24x0_watchdog *s3c24x0_get_base_watchdog(void)
++{
++	return (struct s3c24x0_watchdog *)S3C24X0_WATCHDOG_BASE;
++}
++
++static inline struct s3c24x0_i2c *s3c24x0_get_base_i2c(void)
++{
++	return (struct s3c24x0_i2c *)S3C24X0_I2C_BASE;
++}
++
++static inline struct s3c24x0_i2s *s3c24x0_get_base_i2s(void)
++{
++	return (struct s3c24x0_i2s *)S3C24X0_I2S_BASE;
++}
++
++static inline struct s3c24x0_gpio *s3c24x0_get_base_gpio(void)
++{
++	return (struct s3c24x0_gpio *)S3C24X0_GPIO_BASE;
++}
++
++static inline struct s3c24x0_rtc *s3c24x0_get_base_rtc(void)
++{
++	return (struct s3c24x0_rtc *)S3C24X0_RTC_BASE;
++}
++
++static inline struct s3c2440_adc *s3c2440_get_base_adc(void)
++{
++	return (struct s3c2440_adc *)S3C2440_ADC_BASE;
++}
++
++static inline struct s3c24x0_spi *s3c24x0_get_base_spi(void)
++{
++	return (struct s3c24x0_spi *)S3C24X0_SPI_BASE;
++}
++
++static inline struct s3c2440_sdi *s3c2440_get_base_sdi(void)
++{
++	return (struct s3c2440_sdi *)S3C2440_SDI_BASE;
++}
++
++#endif /*__S3C2440_H__*/
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c24x0_cpu.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c24x0_cpu.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c24x0_cpu.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c24x0_cpu.h	2019-05-06 00:27:30.801328744 +0800
+@@ -0,0 +1,15 @@
++/*
++ * (C) Copyright 2009
++ * Kevin Morfitt, Fearnside Systems Ltd, <kevin.morfitt@fearnside-systems.co.uk>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++#ifdef CONFIG_S3C2400
++	#include <asm/arch/s3c2400.h>
++#elif defined CONFIG_S3C2410
++	#include <asm/arch/s3c2410.h>
++#elif defined CONFIG_S3C2440
++	#include <asm/arch/s3c2440.h>
++#else
++	#error Please define the s3c24x0 cpu type
++#endif
+diff -urN u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h
+--- u-boot-2018.03/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h	2019-05-06 00:28:59.203299665 +0800
+@@ -0,0 +1,738 @@
++/*
++ * (C) Copyright 2003
++ * David Müller ELSOFT AG Switzerland. d.mueller@elsoft.ch
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++/************************************************
++ * NAME	    : s3c24x0.h
++ * Version  : 31.3.2003
++ *
++ * common stuff for SAMSUNG S3C24X0 SoC
++ ************************************************/
++
++#ifndef __S3C24X0_H__
++#define __S3C24X0_H__
++
++/* Memory controller (see manual chapter 5) */
++struct s3c24x0_memctl {
++	u32	bwscon;
++	u32	bankcon[8];
++	u32	refresh;
++	u32	banksize;
++	u32	mrsrb6;
++	u32	mrsrb7;
++};
++
++
++/* USB HOST (see manual chapter 12) */
++struct s3c24x0_usb_host {
++	u32	HcRevision;
++	u32	HcControl;
++	u32	HcCommonStatus;
++	u32	HcInterruptStatus;
++	u32	HcInterruptEnable;
++	u32	HcInterruptDisable;
++	u32	HcHCCA;
++	u32	HcPeriodCuttendED;
++	u32	HcControlHeadED;
++	u32	HcControlCurrentED;
++	u32	HcBulkHeadED;
++	u32	HcBuldCurrentED;
++	u32	HcDoneHead;
++	u32	HcRmInterval;
++	u32	HcFmRemaining;
++	u32	HcFmNumber;
++	u32	HcPeriodicStart;
++	u32	HcLSThreshold;
++	u32	HcRhDescriptorA;
++	u32	HcRhDescriptorB;
++	u32	HcRhStatus;
++	u32	HcRhPortStatus1;
++	u32	HcRhPortStatus2;
++};
++
++
++/* INTERRUPT (see manual chapter 14) */
++struct s3c24x0_interrupt {
++	u32	srcpnd;
++	u32	intmod;
++	u32	intmsk;
++	u32	priority;
++	u32	intpnd;
++	u32	intoffset;
++#if defined(CONFIG_S3C2410) || defined(CONFIG_S3C2440)
++	u32	subsrcpnd;
++	u32	intsubmsk;
++#endif
++};
++
++
++/* DMAS (see manual chapter 8) */
++struct s3c24x0_dma {
++	u32	disrc;
++#if defined(CONFIG_S3C2410) || defined(CONFIG_S3C2440)
++	u32	disrcc;
++#endif
++	u32	didst;
++#if defined(CONFIG_S3C2410) || defined(CONFIG_S3C2440)
++	u32	didstc;
++#endif
++	u32	dcon;
++	u32	dstat;
++	u32	dcsrc;
++	u32	dcdst;
++	u32	dmasktrig;
++#if defined(CONFIG_S3C2400) || defined(CONFIG_S3C2410) \
++		|| defined(CONFIG_S3C2440)
++	u32	res[1];
++#endif
++};
++
++struct s3c24x0_dmas {
++	struct s3c24x0_dma	dma[4];
++};
++
++
++/* CLOCK & POWER MANAGEMENT (see S3C2400 manual chapter 6) */
++/*                          (see S3C2410 manual chapter 7) */
++struct s3c24x0_clock_power {
++	u32	locktime;
++	u32	mpllcon;
++	u32	upllcon;
++	u32	clkcon;
++	u32	clkslow;
++	u32	clkdivn;
++#if defined(CONFIG_S3C2440)
++	u32	camdivn;
++#endif
++};
++
++
++/* LCD CONTROLLER (see manual chapter 15) */
++struct s3c24x0_lcd {
++	u32	lcdcon1;
++	u32	lcdcon2;
++	u32	lcdcon3;
++	u32	lcdcon4;
++	u32	lcdcon5;
++	u32	lcdsaddr1;
++	u32	lcdsaddr2;
++	u32	lcdsaddr3;
++	u32	redlut;
++	u32	greenlut;
++	u32	bluelut;
++	u32	res[8];
++	u32	dithmode;
++	u32	tpal;
++#if defined(CONFIG_S3C2410) || defined(CONFIG_S3C2440)
++	u32	lcdintpnd;
++	u32	lcdsrcpnd;
++	u32	lcdintmsk;
++	u32	lpcsel;
++#endif
++};
++
++
++#ifdef CONFIG_S3C2410
++/* NAND FLASH (see S3C2410 manual chapter 6) */
++struct s3c2410_nand {
++	u32	nfconf;
++	u32	nfcmd;
++	u32	nfaddr;
++	u32	nfdata;
++	u32	nfstat;
++	u32	nfecc;
++};
++#endif
++#ifdef CONFIG_S3C2440
++/* NAND FLASH (see S3C2440 manual chapter 6) */
++struct s3c2440_nand {
++	u32	nfconf;
++	u32	nfcont;
++	u32	nfcmd;
++	u32	nfaddr;
++	u32	nfdata;
++	u32	nfeccd0;
++	u32	nfeccd1;
++	u32	nfeccd;
++	u32	nfstat;
++	u32	nfstat0;
++	u32	nfstat1;
++};
++#endif
++
++
++/* UART (see manual chapter 11) */
++struct s3c24x0_uart {
++	u32	ulcon;
++	u32	ucon;
++	u32	ufcon;
++	u32	umcon;
++	u32	utrstat;
++	u32	uerstat;
++	u32	ufstat;
++	u32	umstat;
++#ifdef __BIG_ENDIAN
++	u8	res1[3];
++	u8	utxh;
++	u8	res2[3];
++	u8	urxh;
++#else /* Little Endian */
++	u8	utxh;
++	u8	res1[3];
++	u8	urxh;
++	u8	res2[3];
++#endif
++	u32	ubrdiv;
++};
++
++
++/* PWM TIMER (see manual chapter 10) */
++struct s3c24x0_timer {
++	u32	tcntb;
++	u32	tcmpb;
++	u32	tcnto;
++};
++
++struct s3c24x0_timers {
++	u32	tcfg0;
++	u32	tcfg1;
++	u32	tcon;
++	struct s3c24x0_timer	ch[4];
++	u32	tcntb4;
++	u32	tcnto4;
++};
++
++
++/* USB DEVICE (see manual chapter 13) */
++struct s3c24x0_usb_dev_fifos {
++#ifdef __BIG_ENDIAN
++	u8	res[3];
++	u8	ep_fifo_reg;
++#else /*  little endian */
++	u8	ep_fifo_reg;
++	u8	res[3];
++#endif
++};
++
++struct s3c24x0_usb_dev_dmas {
++#ifdef __BIG_ENDIAN
++	u8	res1[3];
++	u8	ep_dma_con;
++	u8	res2[3];
++	u8	ep_dma_unit;
++	u8	res3[3];
++	u8	ep_dma_fifo;
++	u8	res4[3];
++	u8	ep_dma_ttc_l;
++	u8	res5[3];
++	u8	ep_dma_ttc_m;
++	u8	res6[3];
++	u8	ep_dma_ttc_h;
++#else /*  little endian */
++	u8	ep_dma_con;
++	u8	res1[3];
++	u8	ep_dma_unit;
++	u8	res2[3];
++	u8	ep_dma_fifo;
++	u8	res3[3];
++	u8	ep_dma_ttc_l;
++	u8	res4[3];
++	u8	ep_dma_ttc_m;
++	u8	res5[3];
++	u8	ep_dma_ttc_h;
++	u8	res6[3];
++#endif
++};
++
++struct s3c24x0_usb_device {
++#ifdef __BIG_ENDIAN
++	u8	res1[3];
++	u8	func_addr_reg;
++	u8	res2[3];
++	u8	pwr_reg;
++	u8	res3[3];
++	u8	ep_int_reg;
++	u8	res4[15];
++	u8	usb_int_reg;
++	u8	res5[3];
++	u8	ep_int_en_reg;
++	u8	res6[15];
++	u8	usb_int_en_reg;
++	u8	res7[3];
++	u8	frame_num1_reg;
++	u8	res8[3];
++	u8	frame_num2_reg;
++	u8	res9[3];
++	u8	index_reg;
++	u8	res10[7];
++	u8	maxp_reg;
++	u8	res11[3];
++	u8	ep0_csr_in_csr1_reg;
++	u8	res12[3];
++	u8	in_csr2_reg;
++	u8	res13[7];
++	u8	out_csr1_reg;
++	u8	res14[3];
++	u8	out_csr2_reg;
++	u8	res15[3];
++	u8	out_fifo_cnt1_reg;
++	u8	res16[3];
++	u8	out_fifo_cnt2_reg;
++#else /*  little endian */
++	u8	func_addr_reg;
++	u8	res1[3];
++	u8	pwr_reg;
++	u8	res2[3];
++	u8	ep_int_reg;
++	u8	res3[15];
++	u8	usb_int_reg;
++	u8	res4[3];
++	u8	ep_int_en_reg;
++	u8	res5[15];
++	u8	usb_int_en_reg;
++	u8	res6[3];
++	u8	frame_num1_reg;
++	u8	res7[3];
++	u8	frame_num2_reg;
++	u8	res8[3];
++	u8	index_reg;
++	u8	res9[7];
++	u8	maxp_reg;
++	u8	res10[7];
++	u8	ep0_csr_in_csr1_reg;
++	u8	res11[3];
++	u8	in_csr2_reg;
++	u8	res12[3];
++	u8	out_csr1_reg;
++	u8	res13[7];
++	u8	out_csr2_reg;
++	u8	res14[3];
++	u8	out_fifo_cnt1_reg;
++	u8	res15[3];
++	u8	out_fifo_cnt2_reg;
++	u8	res16[3];
++#endif /*  __BIG_ENDIAN */
++	struct s3c24x0_usb_dev_fifos	fifo[5];
++	struct s3c24x0_usb_dev_dmas	dma[5];
++};
++
++
++/* WATCH DOG TIMER (see manual chapter 18) */
++struct s3c24x0_watchdog {
++	u32	wtcon;
++	u32	wtdat;
++	u32	wtcnt;
++};
++
++
++/* IIC (see manual chapter 20) */
++struct s3c24x0_i2c {
++	u32	iiccon;
++	u32	iicstat;
++	u32	iicadd;
++	u32	iicds;
++};
++
++
++/* IIS (see manual chapter 21) */
++struct s3c24x0_i2s {
++#ifdef __BIG_ENDIAN
++	u16	res1;
++	u16	iiscon;
++	u16	res2;
++	u16	iismod;
++	u16	res3;
++	u16	iispsr;
++	u16	res4;
++	u16	iisfcon;
++	u16	res5;
++	u16	iisfifo;
++#else /*  little endian */
++	u16	iiscon;
++	u16	res1;
++	u16	iismod;
++	u16	res2;
++	u16	iispsr;
++	u16	res3;
++	u16	iisfcon;
++	u16	res4;
++	u16	iisfifo;
++	u16	res5;
++#endif
++};
++
++
++/* I/O PORT (see manual chapter 9) */
++struct s3c24x0_gpio {
++#ifdef CONFIG_S3C2400
++	u32	pacon;
++	u32	padat;
++
++	u32	pbcon;
++	u32	pbdat;
++	u32	pbup;
++
++	u32	pccon;
++	u32	pcdat;
++	u32	pcup;
++
++	u32	pdcon;
++	u32	pddat;
++	u32	pdup;
++
++	u32	pecon;
++	u32	pedat;
++	u32	peup;
++
++	u32	pfcon;
++	u32	pfdat;
++	u32	pfup;
++
++	u32	pgcon;
++	u32	pgdat;
++	u32	pgup;
++
++	u32	opencr;
++
++	u32	misccr;
++	u32	extint;
++#endif
++#ifdef CONFIG_S3C2410
++	u32	gpacon;
++	u32	gpadat;
++	u32	res1[2];
++	u32	gpbcon;
++	u32	gpbdat;
++	u32	gpbup;
++	u32	res2;
++	u32	gpccon;
++	u32	gpcdat;
++	u32	gpcup;
++	u32	res3;
++	u32	gpdcon;
++	u32	gpddat;
++	u32	gpdup;
++	u32	res4;
++	u32	gpecon;
++	u32	gpedat;
++	u32	gpeup;
++	u32	res5;
++	u32	gpfcon;
++	u32	gpfdat;
++	u32	gpfup;
++	u32	res6;
++	u32	gpgcon;
++	u32	gpgdat;
++	u32	gpgup;
++	u32	res7;
++	u32	gphcon;
++	u32	gphdat;
++	u32	gphup;
++	u32	res8;
++
++	u32	misccr;
++	u32	dclkcon;
++	u32	extint0;
++	u32	extint1;
++	u32	extint2;
++	u32	eintflt0;
++	u32	eintflt1;
++	u32	eintflt2;
++	u32	eintflt3;
++	u32	eintmask;
++	u32	eintpend;
++	u32	gstatus0;
++	u32	gstatus1;
++	u32	gstatus2;
++	u32	gstatus3;
++	u32	gstatus4;
++#endif
++#if defined(CONFIG_S3C2440)
++	u32	gpacon;
++	u32	gpadat;
++	u32	res1[2];
++	u32	gpbcon;
++	u32	gpbdat;
++	u32	gpbup;
++	u32	res2;
++	u32	gpccon;
++	u32	gpcdat;
++	u32	gpcup;
++	u32	res3;
++	u32	gpdcon;
++	u32	gpddat;
++	u32	gpdup;
++	u32	res4;
++	u32	gpecon;
++	u32	gpedat;
++	u32	gpeup;
++	u32	res5;
++	u32	gpfcon;
++	u32	gpfdat;
++	u32	gpfup;
++	u32	res6;
++	u32	gpgcon;
++	u32	gpgdat;
++	u32	gpgup;
++	u32	res7;
++	u32	gphcon;
++	u32	gphdat;
++	u32	gphup;
++	u32	res8;
++
++	u32	misccr;
++	u32	dclkcon;
++	u32	extint0;
++	u32	extint1;
++	u32	extint2;
++	u32	eintflt0;
++	u32	eintflt1;
++	u32	eintflt2;
++	u32	eintflt3;
++	u32	eintmask;
++	u32	eintpend;
++	u32	gstatus0;
++	u32	gstatus1;
++	u32	gstatus2;
++	u32	gstatus3;
++	u32	gstatus4;
++
++	u32	res9;
++	u32	dsc0;
++	u32	dsc1;
++	u32	mslcon;
++	u32	gpjcon;
++	u32	gpjdat;
++	u32	gpjup;
++	u32	res10;
++#endif
++};
++int    get_clocks (void);
++ulong    get_bus_freq  (ulong);
++int get_serial_clock(void);
++#if defined(CONFIG_S3C24X0)
++ulong get_FCLK(void);
++ulong get_HCLK(void);
++ulong get_PCLK(void);
++ulong get_UCLK(void);
++#endif
++
++/* RTC (see manual chapter 17) */
++struct s3c24x0_rtc {
++#ifdef __BIG_ENDIAN
++	u8	res1[67];
++	u8	rtccon;
++	u8	res2[3];
++	u8	ticnt;
++	u8	res3[11];
++	u8	rtcalm;
++	u8	res4[3];
++	u8	almsec;
++	u8	res5[3];
++	u8	almmin;
++	u8	res6[3];
++	u8	almhour;
++	u8	res7[3];
++	u8	almdate;
++	u8	res8[3];
++	u8	almmon;
++	u8	res9[3];
++	u8	almyear;
++	u8	res10[3];
++	u8	rtcrst;
++	u8	res11[3];
++	u8	bcdsec;
++	u8	res12[3];
++	u8	bcdmin;
++	u8	res13[3];
++	u8	bcdhour;
++	u8	res14[3];
++	u8	bcddate;
++	u8	res15[3];
++	u8	bcdday;
++	u8	res16[3];
++	u8	bcdmon;
++	u8	res17[3];
++	u8	bcdyear;
++#else /*  little endian */
++	u8	res0[64];
++	u8	rtccon;
++	u8	res1[3];
++	u8	ticnt;
++	u8	res2[11];
++	u8	rtcalm;
++	u8	res3[3];
++	u8	almsec;
++	u8	res4[3];
++	u8	almmin;
++	u8	res5[3];
++	u8	almhour;
++	u8	res6[3];
++	u8	almdate;
++	u8	res7[3];
++	u8	almmon;
++	u8	res8[3];
++	u8	almyear;
++	u8	res9[3];
++	u8	rtcrst;
++	u8	res10[3];
++	u8	bcdsec;
++	u8	res11[3];
++	u8	bcdmin;
++	u8	res12[3];
++	u8	bcdhour;
++	u8	res13[3];
++	u8	bcddate;
++	u8	res14[3];
++	u8	bcdday;
++	u8	res15[3];
++	u8	bcdmon;
++	u8	res16[3];
++	u8	bcdyear;
++	u8	res17[3];
++#endif
++};
++
++
++/* ADC (see manual chapter 16) */
++struct s3c2400_adc {
++	u32	adccon;
++	u32	adcdat;
++};
++
++
++/* ADC (see manual chapter 16) */
++struct s3c2410_adc {
++	u32	adccon;
++	u32	adctsc;
++	u32	adcdly;
++	u32	adcdat0;
++	u32	adcdat1;
++};
++
++
++/* SPI (see manual chapter 22) */
++struct s3c24x0_spi_channel {
++	u8	spcon;
++	u8	res1[3];
++	u8	spsta;
++	u8	res2[3];
++	u8	sppin;
++	u8	res3[3];
++	u8	sppre;
++	u8	res4[3];
++	u8	sptdat;
++	u8	res5[3];
++	u8	sprdat;
++	u8	res6[3];
++	u8	res7[16];
++};
++
++struct s3c24x0_spi {
++	struct s3c24x0_spi_channel	ch[S3C24X0_SPI_CHANNELS];
++};
++
++
++/* MMC INTERFACE (see S3C2400 manual chapter 19) */
++struct s3c2400_mmc {
++#ifdef __BIG_ENDIAN
++	u8	res1[3];
++	u8	mmcon;
++	u8	res2[3];
++	u8	mmcrr;
++	u8	res3[3];
++	u8	mmfcon;
++	u8	res4[3];
++	u8	mmsta;
++	u16	res5;
++	u16	mmfsta;
++	u8	res6[3];
++	u8	mmpre;
++	u16	res7;
++	u16	mmlen;
++	u8	res8[3];
++	u8	mmcr7;
++	u32	mmrsp[4];
++	u8	res9[3];
++	u8	mmcmd0;
++	u32	mmcmd1;
++	u16	res10;
++	u16	mmcr16;
++	u8	res11[3];
++	u8	mmdat;
++#else
++	u8	mmcon;
++	u8	res1[3];
++	u8	mmcrr;
++	u8	res2[3];
++	u8	mmfcon;
++	u8	res3[3];
++	u8	mmsta;
++	u8	res4[3];
++	u16	mmfsta;
++	u16	res5;
++	u8	mmpre;
++	u8	res6[3];
++	u16	mmlen;
++	u16	res7;
++	u8	mmcr7;
++	u8	res8[3];
++	u32	mmrsp[4];
++	u8	mmcmd0;
++	u8	res9[3];
++	u32	mmcmd1;
++	u16	mmcr16;
++	u16	res10;
++	u8	mmdat;
++	u8	res11[3];
++#endif
++};
++
++
++/* SD INTERFACE (see S3C2410 manual chapter 19) */
++struct s3c2410_sdi {
++	u32	sdicon;
++	u32	sdipre;
++	u32	sdicarg;
++	u32	sdiccon;
++	u32	sdicsta;
++	u32	sdirsp0;
++	u32	sdirsp1;
++	u32	sdirsp2;
++	u32	sdirsp3;
++	u32	sdidtimer;
++	u32	sdibsize;
++	u32	sdidcon;
++	u32	sdidcnt;
++	u32	sdidsta;
++	u32	sdifsta;
++#ifdef __BIG_ENDIAN
++	u8	res[3];
++	u8	sdidat;
++#else
++	u8	sdidat;
++	u8	res[3];
++#endif
++	u32	sdiimsk;
++};
++
++#endif /*__S3C24X0_H__*/
+diff -urN u-boot-2018.03/arch/arm/include/asm/mach-types.h u-boot-2018.03s/arch/arm/include/asm/mach-types.h
+--- u-boot-2018.03/arch/arm/include/asm/mach-types.h	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/include/asm/mach-types.h	2019-04-16 19:07:17.000000000 +0800
+@@ -5,7 +5,9 @@
+ 
+ #ifndef __ASM_ARM_MACH_TYPE_H
+ #define __ASM_ARM_MACH_TYPE_H
+-
++#ifndef __ASSEMBLY__
++extern unsigned int __machine_arch_type;
++#endif
+ /* see arch/arm/kernel/arch.c for a description of these */
+ #define MACH_TYPE_EBSA110              0
+ #define MACH_TYPE_RISCPC               1
+@@ -1005,7 +1007,7 @@
+ #define MACH_TYPE_S3C2443              1005
+ #define MACH_TYPE_OMAP_LDK             1006
+ #define MACH_TYPE_SMDK2460             1007
+-#define MACH_TYPE_SMDK2440             1008
++#define MACH_TYPE_JZ2440               1008
+ #define MACH_TYPE_SMDK2412             1009
+ #define MACH_TYPE_WEBBOX               1010
+ #define MACH_TYPE_CWWNDP               1011
+@@ -5057,4 +5059,15 @@
+ #define MACH_TYPE_NASM25               5112
+ #define MACH_TYPE_TOMATO               5113
+ #define MACH_TYPE_OMAP3_MRC3D          5114
++#ifdef CONFIG_ARCH_JZ2440
++# ifdef machine_arch_type
++# undef machine_arch_type
++# define machine_arch_type __machine_arch_type
++# else
++# define machine_arch_type MACH_TYPE_JZ2440
++# endif
++# define machine_is_jz2440()    (machine_arch_type == MACH_TYPE_JZ2440)
++#else
++# define machine_is_jz2440()    (0)
++#endif
+ #endif
+diff -urN u-boot-2018.03/arch/arm/Kconfig u-boot-2018.03s/arch/arm/Kconfig
+--- u-boot-2018.03/arch/arm/Kconfig	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/Kconfig	2019-04-16 11:32:07.000000000 +0800
+@@ -343,7 +343,33 @@
+ config ARCH_AT91
+ 	bool "Atmel AT91"
+ 	select SPL_BOARD_INIT if SPL
++config S3C24X0
++    bool "Samsung S3C24X0"
++    select CPU_ARM920T
++    help
++       The S3C24X0 is deperated,but I want use it.
++
++if S3C24X0
++
++choice
++    prompt "S3C24X0 architecture type select"
++    optional
++config S3C2440
++    bool "S3C2440 CPU select"
++    select CPU_ARM920T
++config S3C2410
++    bool "S3C2410 CPU select"
+ 
++endchoice
++
++if S3C2440
++choice
++    prompt "S3C2440 board select"
++config TARGET_JZ2440
++    bool "s3c2440 board select"
++endchoice
++endif
++endif
+ config TARGET_EDB93XX
+ 	bool "Support edb93xx"
+ 	select CPU_ARM920T
+@@ -1321,6 +1347,7 @@
+ source "board/isee/igep003x/Kconfig"
+ source "board/phytec/pcm051/Kconfig"
+ source "board/silica/pengwyn/Kconfig"
++source "board/samsung/jz2440/Kconfig"
+ source "board/spear/spear300/Kconfig"
+ source "board/spear/spear310/Kconfig"
+ source "board/spear/spear320/Kconfig"
+diff -urN u-boot-2018.03/arch/arm/lib/crt0.S u-boot-2018.03s/arch/arm/lib/crt0.S
+--- u-boot-2018.03/arch/arm/lib/crt0.S	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/lib/crt0.S	2019-05-03 00:31:59.122003690 +0800
+@@ -61,8 +61,47 @@
+  */
+ 
+ /*
+- * entry point of crt0 sequence
+- */
++ENTRY(_main)
++
++
++	ldr	r0, =(CONFIG_SYS_INIT_SP_ADDR)
++	bic	r0, r0, #7	
++	mov	sp, r0
++
++
++        bl      nand_init_ll
++
++        mov r0, #0
++        ldr r1,=(CONFIG_SYS_TEXT_BASE)
++        ldr r2,=0x80000
++        bl copy_code_to_sdram
++
++        bl clear_bss 
++        ldr pc,=call_board_init_f
++
++call_board_init_f:
++        ldr     r0, =(CONFIG_SYS_INIT_SP_ADDR)
++  
++        bic     r0, r0, #7
++        mov     sp, r0
++	bl	board_init_f_alloc_reserve
++
++	mov	sp, r0
++	mov	r9, r0
++	bl	board_init_f_init_reserve
++	mov	r0, #0
++	bl	board_init_f
++
++
++
++	bl coloured_LED_init
++	bl red_led_on
++	mov     r0, r9                  
++	ldr	r1, [r9, #GD_RELOCADDR]
++	ldr	pc, =board_init_r
++
++ENDPROC(_main)
++*/
+ 
+ ENTRY(_main)
+ 
+@@ -77,6 +116,20 @@
+ #endif
+ 	bic	r0, r0, #7	/* 8-byte alignment for ABI compliance */
+ 	mov	sp, r0
++        bl      nand_init_ll
++		
++        mov r0, #0
++        ldr r1,=(CONFIG_SYS_TEXT_BASE)
++        ldr r2,=0x80000
++        bl copy_code_to_sdram
++
++        bl clear_bss 
++        ldr pc,=call_board_init_f
++
++call_board_init_f:
++        ldr     r0, =(CONFIG_SYS_INIT_SP_ADDR)
++        bic     r0, r0, #7
++        mov     sp, r0
+ 	bl	board_init_f_alloc_reserve
+ 	mov	sp, r0
+ 	/* set up gd here, outside any C code */
+@@ -86,6 +139,13 @@
+ 	mov	r0, #0
+ 	bl	board_init_f
+ 
++        mov     r0, r9                  /* gd_t */
++	ldr	r1, [r9, #GD_RELOCADDR]
++	//ldr	r1, =(CONFIG_SYS_TEXT_BASE)
++
++	/*ldr	pc, =board_init_r*/	/* this is auto-relocated! */
++        bl      board_init_r
++
+ #if ! defined(CONFIG_SPL_BUILD)
+ 
+ /*
+@@ -166,3 +226,5 @@
+ #endif
+ 
+ ENDPROC(_main)
++
++
+diff -urN u-boot-2018.03/arch/arm/lib/Makefile u-boot-2018.03s/arch/arm/lib/Makefile
+--- u-boot-2018.03/arch/arm/lib/Makefile	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/arch/arm/lib/Makefile	2019-04-29 00:15:36.992050135 +0800
+@@ -14,7 +14,8 @@
+ else ifdef CONFIG_ARM64
+ obj-y	+= crt0_64.o
+ else
+-obj-y	+= vectors.o crt0.o
++obj-y	+= crt0.o
++obj-y   += vectors.o
+ endif
+ 
+ ifdef CONFIG_ARM64
+diff -urN u-boot-2018.03/board/samsung/jz2440/init.c u-boot-2018.03s/board/samsung/jz2440/init.c
+--- u-boot-2018.03/board/samsung/jz2440/init.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/init.c	2019-04-24 15:14:19.951874490 +0800
+@@ -0,0 +1,163 @@
++/* NAND FLASH控制器 */
++#include <common.h>
++#define NFCONF (*((volatile unsigned long *)0x4E000000))
++#define NFCONT (*((volatile unsigned long *)0x4E000004))
++#define NFCMMD (*((volatile unsigned char *)0x4E000008))
++#define NFADDR (*((volatile unsigned char *)0x4E00000C))
++#define NFDATA (*((volatile unsigned char *)0x4E000010))
++#define NFSTAT (*((volatile unsigned char *)0x4E000020))
++
++/* GPIO */
++#define GPHCON              (*(volatile unsigned long *)0x56000070)
++#define GPHUP               (*(volatile unsigned long *)0x56000078)
++
++/* UART registers*/
++#define ULCON0              (*(volatile unsigned long *)0x50000000)
++#define UCON0               (*(volatile unsigned long *)0x50000004)
++#define UFCON0              (*(volatile unsigned long *)0x50000008)
++#define UMCON0              (*(volatile unsigned long *)0x5000000c)
++#define UTRSTAT0            (*(volatile unsigned long *)0x50000010)
++#define UTXH0               (*(volatile unsigned char *)0x50000020)
++#define URXH0               (*(volatile unsigned char *)0x50000024)
++#define UBRDIV0             (*(volatile unsigned long *)0x50000028)
++
++#define TXD0READY   (1<<2)
++
++
++void nand_read_ll(unsigned int addr, unsigned char *buf, unsigned int len);
++
++/* 判定是否是nor启动 */
++static int isBootFromNorFlash(void)
++{
++    volatile int *p = (volatile int *)0;
++    int val;
++
++    val = *p;
++    *p = 0x12345678;
++    if (*p == 0x12345678)
++    {
++        /* 写成功, 是nand启动 */
++        *p = val;
++        return 0;
++    }
++    else
++    {
++        /* NOR不能像内存一样写 */
++        return 1;
++    }
++}
++
++/* 拷贝代码到sdram */
++void copy_code_to_sdram(unsigned char *src, unsigned char *dest, unsigned int len)
++{
++    
++    
++        nand_read_ll((unsigned int)src, dest, len);
++}
++
++/* 清除BSS */
++void clear_bss(void)
++{
++    extern int __bss_start, __bss_end;
++    int *p = &__bss_start;
++    
++    for (; p < &__bss_end; p++)
++        *p = 0;
++    return ;
++}
++
++/* nand初始化 */
++void nand_init_ll(void)
++{
++#define TACLS   0
++#define TWRPH0  1
++#define TWRPH1  0
++    /* 设置时序 */
++    NFCONF = (TACLS<<12)|(TWRPH0<<8)|(TWRPH1<<4);
++    /* 使能NAND Flash控制器, 初始化ECC, 禁止片选 */
++    NFCONT = (1<<4)|(1<<1)|(1<<0);    
++}
++
++static void nand_select(void)
++{
++    NFCONT &= ~(1<<1);    
++}
++
++static void nand_deselect(void)
++{
++    NFCONT |= (1<<1);    
++}
++
++static void nand_cmd(unsigned char cmd)
++{
++    volatile int i;
++    NFCMMD = cmd;
++    for (i = 0; i < 10; i++);
++}
++
++static void nand_addr(unsigned int addr)
++{
++    unsigned int col  = addr % 2048;
++    unsigned int page = addr / 2048;
++    volatile int i;
++
++    NFADDR = col & 0xff;
++    for (i = 0; i < 10; i++);
++    NFADDR = (col >> 8) & 0xff;
++    for (i = 0; i < 10; i++);
++    
++    NFADDR  = page & 0xff;
++    for (i = 0; i < 10; i++);
++    NFADDR  = (page >> 8) & 0xff;
++    for (i = 0; i < 10; i++);
++    NFADDR  = (page >> 16) & 0xff;
++    for (i = 0; i < 10; i++);    
++}
++
++static void nand_wait_ready(void)
++{
++    while (!(NFSTAT & 1));
++}
++
++static unsigned char nand_data(void)
++{
++    return NFDATA;
++}
++
++void nand_read_ll(unsigned int addr, unsigned char *buf, unsigned int len)
++{
++    int col = addr % 2048;
++    int i = 0;
++        
++    /* 1. 选中 */
++    nand_select();
++
++    while (i < len)
++    {
++        /* 2. 发出读命令00h */
++        nand_cmd(0x00);
++
++        /* 3. 发出地址(分5步发出) */
++        nand_addr(addr);
++
++        /* 4. 发出读命令30h */
++        nand_cmd(0x30);
++
++        /* 5. 判断状态 */
++        nand_wait_ready();
++
++        /* 6. 读数据 */
++        for (; (col < 2048) && (i < len); col++)
++        {
++            buf[i] = nand_data();
++            i++;
++            addr++;
++        }
++        
++        col = 0;
++    }
++
++    /* 7. 取消选中 */        
++    nand_deselect();
++    return ;
++}
+diff -urN u-boot-2018.03/board/samsung/jz2440/jz2440.c u-boot-2018.03s/board/samsung/jz2440/jz2440.c
+--- u-boot-2018.03/board/samsung/jz2440/jz2440.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/jz2440.c	2019-05-06 00:45:09.443091984 +0800
+@@ -0,0 +1,143 @@
++/*
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Marius Groeger <mgroeger@sysgo.de>
++ *
++ * (C) Copyright 2002, 2010
++ * David Mueller, ELSOFT AG, <d.mueller@elsoft.ch>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <netdev.h>
++#include <asm/io.h>
++#include <asm/mach-types.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#define FCLK_SPEED 1
++
++#if FCLK_SPEED==0		/* Fout = 203MHz, Fin = 12MHz for Audio */
++#define M_MDIV	0xC3
++#define M_PDIV	0x4
++#define M_SDIV	0x1
++#elif FCLK_SPEED==1		/* Fout = 202.8MHz */
++#define M_MDIV	0xA1
++#define M_PDIV	0x3
++#define M_SDIV	0x1
++#endif
++
++#define USB_CLOCK 1
++
++#if USB_CLOCK==0
++#define U_M_MDIV	0xA1
++#define U_M_PDIV	0x3
++#define U_M_SDIV	0x1
++#elif USB_CLOCK==1
++#define U_M_MDIV	0x48
++#define U_M_PDIV	0x3
++#define U_M_SDIV	0x2
++#endif
++
++static inline void pll_delay(unsigned long loops)
++{
++	__asm__ volatile ("1:\n"
++	  "subs %0, %1, #1\n"
++	  "bne 1b":"=r" (loops):"0" (loops));
++}
++
++/*
++ * Miscellaneous platform dependent initialisations
++ */
++
++int board_early_init_f(void)
++{
++	struct s3c24x0_clock_power * const clk_power =
++					s3c24x0_get_base_clock_power();
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++
++	/* to reduce PLL lock time, adjust the LOCKTIME register */
++	//writel(0xFFFFFF, &clk_power->locktime);
++
++	/* configure MPLL */
++	//writel((M_MDIV << 12) + (M_PDIV << 4) + M_SDIV,
++	 //      &clk_power->mpllcon);
++
++	/* some delay between MPLL and UPLL */
++	pll_delay(4000);
++
++	/* configure UPLL */
++	writel((U_M_MDIV << 12) + (U_M_PDIV << 4) + U_M_SDIV,
++	       &clk_power->upllcon);
++
++	/* some delay between MPLL and UPLL */
++	pll_delay(8000);
++
++	/* set up the I/O ports */
++	writel(0x007FFFFF, &gpio->gpacon);
++	writel(0x00044555, &gpio->gpbcon);
++	writel(0x000007FF, &gpio->gpbup);
++	writel(0xAAAAAAAA, &gpio->gpccon);
++	writel(0x0000FFFF, &gpio->gpcup);
++	writel(0xAAAAAAAA, &gpio->gpdcon);
++	writel(0x0000FFFF, &gpio->gpdup);
++	writel(0xAAAAAAAA, &gpio->gpecon);
++	writel(0x0000FFFF, &gpio->gpeup);
++	writel(0x000055AA, &gpio->gpfcon);
++	writel(0x000000FF, &gpio->gpfup);
++	writel(0xFF95FFBA, &gpio->gpgcon);
++	writel(0x0000FFFF, &gpio->gpgup);
++	writel(0x002AFAAA, &gpio->gphcon);
++	writel(0x000007FF, &gpio->gphup);
++
++	return 0;
++}
++
++int board_init(void)
++{
++	/* arch number of SMDK2410-Board */
++	gd->bd->bi_arch_number = MACH_TYPE_MINI2440;
++
++	/* adress of boot parameters */
++	gd->bd->bi_boot_params = 0x30000100;
++
++	icache_enable();
++	dcache_enable();
++
++	return 0;
++}
++
++int dram_init(void)
++{
++	/* dram_init must store complete ramsize in gd->ram_size */
++	gd->ram_size = PHYS_SDRAM_1_SIZE;
++	return 0;
++}
++
++#ifdef CONFIG_CMD_NET
++int board_eth_init(bd_t *bis)
++{
++	int rc = 0;
++#ifdef CONFIG_CS8900
++	rc = cs8900_initialize(0, CONFIG_CS8900_BASE);
++#endif
++#ifdef CONFIG_DRIVER_DM9000
++	rc = dm9000_initialize(bis);
++#endif
++	return rc;
++}
++#endif
++
++/*
++ * Hardcoded flash setup:
++ * Flash 0 is a non-CFI AMD AM29LV800BB flash.
++ */
++ulong board_flash_get_legacy(ulong base, int banknum, flash_info_t *info)
++{
++	info->portwidth = FLASH_CFI_16BIT;
++	info->chipwidth = FLASH_CFI_BY16;
++	info->interface = FLASH_CFI_X16;
++	return 1;
++}
+diff -urN u-boot-2018.03/board/samsung/jz2440/Kconfig u-boot-2018.03s/board/samsung/jz2440/Kconfig
+--- u-boot-2018.03/board/samsung/jz2440/Kconfig	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/Kconfig	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,15 @@
++if TARGET_JZ2440
++
++config SYS_BOARD
++	default "jz2440"
++
++config SYS_VENDOR
++	default "samsung"
++
++config SYS_SOC
++	default "s3c24x0"
++
++config SYS_CONFIG_NAME
++	default "jz2440"
++
++endif
+diff -urN u-boot-2018.03/board/samsung/jz2440/lowlevel_init.S u-boot-2018.03s/board/samsung/jz2440/lowlevel_init.S
+--- u-boot-2018.03/board/samsung/jz2440/lowlevel_init.S	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/lowlevel_init.S	2019-04-25 00:49:17.651435523 +0800
+@@ -0,0 +1,141 @@
++#include <config.h>
++#include <version.h>
++
++
++/* some parameters for the board */
++
++/*
++ *
++ * Taken from linux/arch/arm/boot/compressed/head-s3c2410.S
++ *
++ * Copyright (C) 2002 Samsung Electronics SW.LEE  <hitchcar@sec.samsung.com>
++ * 这里主要是为了初始化 SDRAM
++ */
++
++#define BWSCON    0x48000000        /* 总线宽度和等待控制寄存器 */
++
++/* BWSCON 总线宽度和等待控制寄存器 */
++#define DW8            (0x0)            /* 数据总线宽度为 8位 */
++#define DW16            (0x1)        /* 数据总线宽度为 16位 */
++#define DW32            (0x2)        /* 数据总线宽度为 32位 */
++#define WAIT            (0x1<<2)    /* BANKn WAIT 状态使能 */
++#define UBLB            (0x1<<3)    /* BANKn UB/LB 使能 */
++
++/*     这里不设置 BANK0,BANK0（nGCS0）的数据总线应当配置为 16 位或 32 位的宽度。因为 BANK0 是作为引导 ROM 的 bank（映射到 0x0000_0000），
++    应当在第一个 ROM 访问前决定 BANK0 的总线宽度，其依赖于复位时 OM[1:0]的逻辑电平。 */
++/* 原理图中，SDRAM 连接在GCS6上，因此关注 BANK6 */
++#define B1_BWSCON        (DW32)                    /* BANK1 设置为 32 位的宽度 */
++#define B2_BWSCON        (DW16)                    /* BANK2 设置位 16 位的宽度 */
++#define B3_BWSCON        (DW16 + WAIT + UBLB)    /* BANK2 设置位 16 位的宽度，使能 WEIT 和UBLB */
++#define B4_BWSCON        (DW16)                    /* BANK2 设置位 16 位的宽度 */
++#define B5_BWSCON        (DW16)                    /* BANK2 设置位 16 位的宽度 */
++#define B6_BWSCON        (DW32)                    /* BANK6 设置为 32 位的宽度 */
++#define B7_BWSCON        (DW32)                    /* BANK7 设置为 32 位的宽度 */
++
++/* BANK 控制寄存器 */
++/* BANK0CON */
++#define B0_Tacs            0x0    /*  0clk */
++#define B0_Tcos            0x0    /*  0clk */
++#define B0_Tacc            0x7    /* 14clk */
++#define B0_Tcoh            0x0    /*  0clk */
++#define B0_Tah            0x0    /*  0clk */
++#define B0_Tacp            0x0
++#define B0_PMC            0x0    /* normal */
++
++/* BANK1CON */
++#define B1_Tacs            0x0    /*  0clk */
++#define B1_Tcos            0x0    /*  0clk */
++#define B1_Tacc            0x7    /* 14clk */
++#define B1_Tcoh            0x0    /*  0clk */
++#define B1_Tah            0x0    /*  0clk */
++#define B1_Tacp            0x0
++#define B1_PMC            0x0
++
++#define B2_Tacs            0x0
++#define B2_Tcos            0x0
++#define B2_Tacc            0x7
++#define B2_Tcoh            0x0
++#define B2_Tah            0x0
++#define B2_Tacp            0x0
++#define B2_PMC            0x0
++
++#define B3_Tacs            0x0    /*  0clk */
++#define B3_Tcos            0x3    /*  4clk */
++#define B3_Tacc            0x7    /* 14clk */
++#define B3_Tcoh            0x1    /*  1clk */
++#define B3_Tah            0x0    /*  0clk */
++#define B3_Tacp            0x3     /*  6clk */
++#define B3_PMC            0x0    /* normal */
++
++#define B4_Tacs            0x0    /*  0clk */
++#define B4_Tcos            0x0    /*  0clk */
++#define B4_Tacc            0x7    /* 14clk */
++#define B4_Tcoh            0x0    /*  0clk */
++#define B4_Tah            0x0    /*  0clk */
++#define B4_Tacp            0x0
++#define B4_PMC            0x0    /* normal */
++
++#define B5_Tacs            0x0    /*  0clk */
++#define B5_Tcos            0x0    /*  0clk */
++#define B5_Tacc            0x7    /* 14clk */
++#define B5_Tcoh            0x0    /*  0clk */
++#define B5_Tah            0x0    /*  0clk */
++#define B5_Tacp            0x0
++#define B5_PMC            0x0    /* normal */
++
++/* BANK6 SDRAM配置 */
++#define B6_MT            0x3    /* 配置BANK6的存器类型为 SDRAM */
++#define B6_Trcd            0x1    /* RAS 到 CAS 的延迟为 3 个时钟 */
++#define B6_SCAN            0x1    /* 列地址数为 9bit */
++
++#define B7_MT            0x3    /* SDRAM */
++#define B7_Trcd            0x1    /* 3clk */
++#define B7_SCAN            0x1    /* 9bit */
++
++/* REFRESH parameter */
++#define REFEN            0x1    /* Refresh enable */
++#define TREFMD            0x0    /* CBR(CAS before RAS)/Auto refresh */
++#define Trp            0x0    /* 2clk */
++#define Trc            0x3    /* 7clk */
++#define Tchr            0x2    /* 3clk */
++#define REFCNT            1113    /* period=15.6us, HCLK=60Mhz, (2048+1-15.6*60) */
++/**************************************/
++
++.globl lowlevel_init
++lowlevel_init:
++    /* memory control configuration */
++    /* make r0 relative the current location so that it */
++    /* reads SMRDATA out of FLASH rather than memory ! */
++    ldr     r0, =SMRDATA
++    ldr    r1, =CONFIG_SYS_TEXT_BASE
++    sub    r0, r0, r1                    /* 计算内存控制器的偏移值 */
++    ldr    r1, =BWSCON    /* Bus Width Status Controller */
++    add     r2, r0, #13*4            /* 将SMRDATA这一块地址赋值给r2中 */
++/* 此处遍历赋值表 */
++0:
++    ldr     r3, [r0], #4
++    str     r3, [r1], #4
++    cmp     r2, r0
++    bne     0b
++
++    /* everything is fine now */
++    mov    pc, lr
++
++    .ltorg
++/* the literal pools origin */
++
++/* 存储器控制器寄存器赋值表 */
++SMRDATA:
++    .word (0+(B1_BWSCON<<4)+(B2_BWSCON<<8)+(B3_BWSCON<<12)+(B4_BWSCON<<16)+(B5_BWSCON<<20)+(B6_BWSCON<<24)+(B7_BWSCON<<28))
++    .word ((B0_Tacs<<13)+(B0_Tcos<<11)+(B0_Tacc<<8)+(B0_Tcoh<<6)+(B0_Tah<<4)+(B0_Tacp<<2)+(B0_PMC))
++    .word ((B1_Tacs<<13)+(B1_Tcos<<11)+(B1_Tacc<<8)+(B1_Tcoh<<6)+(B1_Tah<<4)+(B1_Tacp<<2)+(B1_PMC))
++    .word ((B2_Tacs<<13)+(B2_Tcos<<11)+(B2_Tacc<<8)+(B2_Tcoh<<6)+(B2_Tah<<4)+(B2_Tacp<<2)+(B2_PMC))
++    .word ((B3_Tacs<<13)+(B3_Tcos<<11)+(B3_Tacc<<8)+(B3_Tcoh<<6)+(B3_Tah<<4)+(B3_Tacp<<2)+(B3_PMC))
++    .word ((B4_Tacs<<13)+(B4_Tcos<<11)+(B4_Tacc<<8)+(B4_Tcoh<<6)+(B4_Tah<<4)+(B4_Tacp<<2)+(B4_PMC))
++    .word ((B5_Tacs<<13)+(B5_Tcos<<11)+(B5_Tacc<<8)+(B5_Tcoh<<6)+(B5_Tah<<4)+(B5_Tacp<<2)+(B5_PMC))
++    .word ((B6_MT<<15)+(B6_Trcd<<2)+(B6_SCAN))
++    .word ((B7_MT<<15)+(B7_Trcd<<2)+(B7_SCAN))
++    .word ((REFEN<<23)+(TREFMD<<22)+(Trp<<20)+(Trc<<18)+(Tchr<<16)+REFCNT)
++    .word 0xb1
++    .word 0x30
++    .word 0x30
+diff -urN u-boot-2018.03/board/samsung/jz2440/lowlevel_init_s_bak u-boot-2018.03s/board/samsung/jz2440/lowlevel_init_s_bak
+--- u-boot-2018.03/board/samsung/jz2440/lowlevel_init_s_bak	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/lowlevel_init_s_bak	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,148 @@
++/*
++ * Memory Setup stuff - taken from blob memsetup.S
++ *
++ * Copyright (C) 1999 2000 2001 Erik Mouw (J.A.K.Mouw@its.tudelft.nl) and
++ *                     Jan-Derk Bakker (J.D.Bakker@its.tudelft.nl)
++ *
++ * Modified for the Samsung SMDK2410 by
++ * (C) Copyright 2002
++ * David Mueller, ELSOFT AG, <d.mueller@elsoft.ch>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++
++#include <config.h>
++#include <version.h>
++
++
++/* some parameters for the board */
++
++/*
++ *
++ * Taken from linux/arch/arm/boot/compressed/head-s3c2410.S
++ *
++ * Copyright (C) 2002 Samsung Electronics SW.LEE  <hitchcar@sec.samsung.com>
++ *
++ */
++
++#define BWSCON	0x48000000
++
++/* BWSCON */
++#define DW8			(0x0)
++#define DW16			(0x1)
++#define DW32			(0x2)
++#define WAIT			(0x1<<2)
++#define UBLB			(0x1<<3)
++
++#define B1_BWSCON		(DW32)
++#define B2_BWSCON		(DW16)
++#define B3_BWSCON		(DW16 + WAIT + UBLB)
++#define B4_BWSCON		(DW16)
++#define B5_BWSCON		(DW16)
++#define B6_BWSCON		(DW32)
++#define B7_BWSCON		(DW32)
++
++/* BANK0CON */
++#define B0_Tacs			0x0	/*  0clk */
++#define B0_Tcos			0x0	/*  0clk */
++#define B0_Tacc			0x7	/* 14clk */
++#define B0_Tcoh			0x0	/*  0clk */
++#define B0_Tah			0x0	/*  0clk */
++#define B0_Tacp			0x0
++#define B0_PMC			0x0	/* normal */
++
++/* BANK1CON */
++#define B1_Tacs			0x0	/*  0clk */
++#define B1_Tcos			0x0	/*  0clk */
++#define B1_Tacc			0x7	/* 14clk */
++#define B1_Tcoh			0x0	/*  0clk */
++#define B1_Tah			0x0	/*  0clk */
++#define B1_Tacp			0x0
++#define B1_PMC			0x0
++
++#define B2_Tacs			0x0
++#define B2_Tcos			0x0
++#define B2_Tacc			0x7
++#define B2_Tcoh			0x0
++#define B2_Tah			0x0
++#define B2_Tacp			0x0
++#define B2_PMC			0x0
++
++#define B3_Tacs			0x0	/*  0clk */
++#define B3_Tcos			0x3	/*  4clk */
++#define B3_Tacc			0x7	/* 14clk */
++#define B3_Tcoh			0x1	/*  1clk */
++#define B3_Tah			0x0	/*  0clk */
++#define B3_Tacp			0x3     /*  6clk */
++#define B3_PMC			0x0	/* normal */
++
++#define B4_Tacs			0x0	/*  0clk */
++#define B4_Tcos			0x0	/*  0clk */
++#define B4_Tacc			0x7	/* 14clk */
++#define B4_Tcoh			0x0	/*  0clk */
++#define B4_Tah			0x0	/*  0clk */
++#define B4_Tacp			0x0
++#define B4_PMC			0x0	/* normal */
++
++#define B5_Tacs			0x0	/*  0clk */
++#define B5_Tcos			0x0	/*  0clk */
++#define B5_Tacc			0x7	/* 14clk */
++#define B5_Tcoh			0x0	/*  0clk */
++#define B5_Tah			0x0	/*  0clk */
++#define B5_Tacp			0x0
++#define B5_PMC			0x0	/* normal */
++
++#define B6_MT			0x3	/* SDRAM */
++#define B6_Trcd			0x1
++#define B6_SCAN			0x1	/* 9bit */
++
++#define B7_MT			0x3	/* SDRAM */
++#define B7_Trcd			0x1	/* 3clk */
++#define B7_SCAN			0x1	/* 9bit */
++
++/* REFRESH parameter */
++#define REFEN			0x1	/* Refresh enable */
++#define TREFMD			0x0	/* CBR(CAS before RAS)/Auto refresh */
++#define Trp			0x0	/* 2clk */
++#define Trc			0x3	/* 7clk */
++#define Tchr			0x2	/* 3clk */
++#define REFCNT			1113	/* period=15.6us, HCLK=60Mhz, (2048+1-15.6*60) */
++/**************************************/
++
++.globl lowlevel_init
++lowlevel_init:
++	/* memory control configuration */
++	/* make r0 relative the current location so that it */
++	/* reads SMRDATA out of FLASH rather than memory ! */
++	ldr     r0, =SMRDATA
++	ldr	r1, =CONFIG_SYS_TEXT_BASE
++	sub	r0, r0, r1
++	ldr	r1, =BWSCON	/* Bus Width Status Controller */
++	add     r2, r0, #13*4
++0:
++	ldr     r3, [r0], #4
++	str     r3, [r1], #4
++	cmp     r2, r0
++	bne     0b
++
++	/* everything is fine now */
++	mov	pc, lr
++
++	.ltorg
++/* the literal pools origin */
++
++SMRDATA:
++    .word (0+(B1_BWSCON<<4)+(B2_BWSCON<<8)+(B3_BWSCON<<12)+(B4_BWSCON<<16)+(B5_BWSCON<<20)+(B6_BWSCON<<24)+(B7_BWSCON<<28))
++    .word ((B0_Tacs<<13)+(B0_Tcos<<11)+(B0_Tacc<<8)+(B0_Tcoh<<6)+(B0_Tah<<4)+(B0_Tacp<<2)+(B0_PMC))
++    .word ((B1_Tacs<<13)+(B1_Tcos<<11)+(B1_Tacc<<8)+(B1_Tcoh<<6)+(B1_Tah<<4)+(B1_Tacp<<2)+(B1_PMC))
++    .word ((B2_Tacs<<13)+(B2_Tcos<<11)+(B2_Tacc<<8)+(B2_Tcoh<<6)+(B2_Tah<<4)+(B2_Tacp<<2)+(B2_PMC))
++    .word ((B3_Tacs<<13)+(B3_Tcos<<11)+(B3_Tacc<<8)+(B3_Tcoh<<6)+(B3_Tah<<4)+(B3_Tacp<<2)+(B3_PMC))
++    .word ((B4_Tacs<<13)+(B4_Tcos<<11)+(B4_Tacc<<8)+(B4_Tcoh<<6)+(B4_Tah<<4)+(B4_Tacp<<2)+(B4_PMC))
++    .word ((B5_Tacs<<13)+(B5_Tcos<<11)+(B5_Tacc<<8)+(B5_Tcoh<<6)+(B5_Tah<<4)+(B5_Tacp<<2)+(B5_PMC))
++    .word ((B6_MT<<15)+(B6_Trcd<<2)+(B6_SCAN))
++    .word ((B7_MT<<15)+(B7_Trcd<<2)+(B7_SCAN))
++    .word ((REFEN<<23)+(TREFMD<<22)+(Trp<<20)+(Trc<<18)+(Tchr<<16)+REFCNT)
++    .word 0x32
++    .word 0x30
++    .word 0x30
+diff -urN u-boot-2018.03/board/samsung/jz2440/MAINTAINERS u-boot-2018.03s/board/samsung/jz2440/MAINTAINERS
+--- u-boot-2018.03/board/samsung/jz2440/MAINTAINERS	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/MAINTAINERS	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,6 @@
++SMDK2410 BOARD
++M:	David Müller <d.mueller@elsoft.ch>
++S:	Maintained
++F:	board/samsung/smdk2410/
++F:	include/configs/smdk2410.h
++F:	configs/smdk2410_defconfig
+diff -urN u-boot-2018.03/board/samsung/jz2440/Makefile u-boot-2018.03s/board/samsung/jz2440/Makefile
+--- u-boot-2018.03/board/samsung/jz2440/Makefile	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/Makefile	2019-04-29 21:36:11.626647877 +0800
+@@ -0,0 +1,9 @@
++#
++# (C) Copyright 2000-2006
++# Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++obj-y	:=  jz2440.o  init.o  lowlevel_init.o 
++
+diff -urN u-boot-2018.03/board/samsung/jz2440/u-boot.lds u-boot-2018.03s/board/samsung/jz2440/u-boot.lds
+--- u-boot-2018.03/board/samsung/jz2440/u-boot.lds	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/board/samsung/jz2440/u-boot.lds	2019-04-29 21:45:45.027084450 +0800
+@@ -0,0 +1,172 @@
++/* 配置头文件，自动生成的，包含芯片SOC 相关的头文件 */
++#include <config.h>
++/* 主要是做一些 32位 和64 位的适配定义 */
++#include <asm/psci.h>
++/* 输出格式为 elf32-littlearm， */
++OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
++OUTPUT_ARCH(arm)    /* 输出架构为 ARM */
++/* 用来指定整个程序的入口地址，所谓入口地址就是整个程序的开头地址，可以认为就是整个程序的第一句指令。有点像C语言中的main。 */
++ENTRY(_start)        /* _start 就是汇编的起始函数 */
++/* SECTIONS 就是整个链接脚本的指定 */
++SECTIONS
++{
++    /*     指定程序的链接地址有2种方法：一种是在Makefile中ld的flags用-Ttext 0x20000000来指定；
++        第二种是在链接脚本的SECTIONS开头用.=0x20000000来指定。
++        两种都可以实现相同效果。这两种技巧是可以共同配合使用的，也就是说既在链接脚本中指定也在ld flags中用-Ttext来指定。两个都指定以后以-Ttext指定的为准。
++        uboot的最终链接起始地址就是在Makefile中用-Ttext 来指定的，注意 TEXT_BASE 变量。最终来源是 Makefile 中配置对应的命令中，在make xxx_config时得到的。
++        若没有配置，则由此处指定*/
++    . = 0x00000000;
++
++    . = ALIGN(4);    /* 4字节对齐 */
++    
++    /* 代码段 */
++    /* 在代码段中，必须注意文件的排列顺序，这些顺序会影响编译的时候这些 .o 文件在生成的u-boot.bin 中的排列顺序 */
++    /* 指定必须放在前面部分的那些文件就是那些必须安排在前4KB内的文件，这些文件中的函数在前4KB会被调用。在后面第二部分（4KB之后）中调用的程序，前后顺序就无所谓了。 */
++    .text :
++    {
++        /* 映像文件赋值起始地址，它在文件 arch/arm/lib/sections.c 中定义：
++        * char __image_copy_start[0] __attribute__((section(".__image_copy_start")));*/
++        *(.__image_copy_start)
++        /* arch/arm/lib/vectors.S 里有一句：.section ".vectors"  */
++        /* 这里的 vectors 是让 vector.S 链接的二进制文件的开头部分 */
++        *(.vectors)
++
++        CPUDIR/start.o (.text*)        /* 执行 start.S */
++        board/samsung/jz2440/built-in.o (.text*)
++        arch/arm/lib/built-in.o (.text*)
++     
++        *(.text*)    /* 其他代码 */
++    }
++
++    . = ALIGN(4);
++    .rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }    /* 只读数据段 */
++
++    . = ALIGN(4);
++    .data : {            /* 普通数据段，即可读写数据段 */
++        *(.data*)
++    }
++
++    . = ALIGN(4);
++
++    . = .;
++
++    /* 在u-boot的linker_list.h中通过宏定义，让编译器在编译阶段生成了一些顺序链表.u_boot_list*，链接阶段顺序存放到这个.u_boot_list节中。 */
++    /* u-boot启动过程中，会从这个节读取模块驱动，命令行支持的命令等。 */
++    . = ALIGN(4);
++    .u_boot_list : {
++        KEEP(*(SORT(.u_boot_list*)));
++    }
++
++    . = ALIGN(4);
++    
++    /* UEFI 段 */
++    .__efi_runtime_start : {
++        *(.__efi_runtime_start)
++    }
++
++    .efi_runtime : {
++        *(efi_runtime_text)
++        *(efi_runtime_data)
++    }
++
++    .__efi_runtime_stop : {
++        *(.__efi_runtime_stop)
++    }
++
++    .efi_runtime_rel_start :
++    {
++        *(.__efi_runtime_rel_start)
++    }
++
++    .efi_runtime_rel : {
++        *(.relefi_runtime_text)
++        *(.relefi_runtime_data)
++    }
++
++    .efi_runtime_rel_stop :
++    {
++        *(.__efi_runtime_rel_stop)
++    }
++    /* UEFI 段结束地方 */
++    
++    . = ALIGN(4);
++
++    .image_copy_end :
++    {
++        *(.__image_copy_end)
++    }
++
++    /* .rel_dyn* 段 */
++    /* .rel_dyn_start，.rel.dyn和.rel_dyn_end提供了程序的重定位支持 */
++    /*重定位：
++    在老的uboot中，如果我们想要uboot启动后把自己拷贝到内存中的某个地方，只要把要拷贝的地址写给TEXT_BASE即可，
++    然后boot启动后就会把自己拷贝到TEXT_BASE内的地址处运行，在拷贝之前的代码都是相对的，不能出现绝对的跳转，否则会跑飞。
++    在新版的uboot里，TEXT_BASE的含义改变了。它表示用户要把这段代码加载到哪里，通常是通过串口等工具。
++    然后搬移的时候由uboot自己计算一个地址来进行搬移。
++    新版的uboot采用了动态链接技术，在lds文件中有__rel_dyn_start和__rel_dyn_end，这两个符号之间的区域存放着动态链接符号，
++    只要给这里面的符号加上一定的偏移，拷贝到内存中代码的后面相应的位置处，就可以在绝对跳转中找到正确的函数。*/
++    .rel_dyn_start :
++    {
++        *(.__rel_dyn_start)
++    }
++
++    .rel.dyn : {
++        *(.rel*)
++    }
++
++    .rel_dyn_end :
++    {
++        *(.__rel_dyn_end)
++    }
++
++    .end :
++    {
++        *(.__end)
++    }
++
++    _image_binary_end = .;
++
++    /*
++     * Deprecated: this MMU section is used by pxa at present but
++     * should not be used by new boards/CPUs.
++     */
++     /* MMU 表项 */
++    . = ALIGN(4096);
++    .mmutable : {
++        *(.mmutable)
++    }
++
++/*
++ * Compiler-generated __bss_start and __bss_end, see arch/arm/lib/bss.c
++ * __bss_base and __bss_limit are for linker only (overlay ordering)
++ */
++    /* bss 段，.bss节包含了程序中所有未初始化的全局变量 */
++    /* 由链接指令(OVERLAY)可见，.bss_start与__rel_dyn_start，.bss与__bss_base，.bss_end与__bss_limit是重叠的。*/
++    .bss_start __rel_dyn_start (OVERLAY) : {
++        KEEP(*(.__bss_start));
++        __bss_base = .;
++    }
++
++    .bss __bss_base (OVERLAY) : {
++        *(.bss*)
++         . = ALIGN(4);
++         __bss_limit = .;
++    }
++
++    .bss_end __bss_limit (OVERLAY) : {
++        KEEP(*(.__bss_end));
++    }
++
++    /* 其他段，这些节都是在编译链接时自动生成的，主要用于动态链接或调试使用： */
++    .dynsym _image_binary_end : { *(.dynsym) }    /* 动态符号表`dynamic symbol`，但与`.symtab`不同，`.dynsym`只保存动态链接相关的符号，而`.symtab`通常保存了所有的符号； */
++    .dynbss : { *(.dynbss) }    /* 动态未初始化数据表`dynamic bss`; */
++    .dynstr : { *(.dynstr*) }    /* 动态字符串表`dynamic string`，用于保存符号名的字符串表; */
++    .dynamic : { *(.dynamic*) }    /* 保存了动态链接所需要的基本信息，例如依赖哪些共享对象，动态链接符号表的位置，动态链接重定位表的位置，共享对象初始化代码的地址等； */
++    .plt : { *(.plt*) }            /* 程序连接表`Procddure Linkage Table`，是实现动态链接的必要数据； */
++    .interp : { *(.interp*) }    /* 解释器`interpreter`的缩写 */
++    .gnu.hash : { *(.gnu.hash) }    
++    .gnu : { *(.gnu*) }
++    .ARM.exidx : { *(.ARM.exidx*) }    
++    .gnu.linkonce.armexidx : { *(.gnu.linkonce.armexidx.*) }
++    /*.gnu.hash .gnu .ARM.exidx`和`.gnu.linkonce.armexidx`是针对`arm`体系专门生成的段，用于调试时函数调用的`backtrace`，如果不需要调试，则可以不用这两段。 */
++}
+diff -urN u-boot-2018.03/common/board_f.c u-boot-2018.03s/common/board_f.c
+--- u-boot-2018.03/common/board_f.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/common/board_f.c	2019-05-03 00:54:41.357930008 +0800
+@@ -400,8 +400,8 @@
+ 	 * reserve memory for U-Boot code, data & bss
+ 	 * round down to next 4 kB limit
+ 	 */
+-	gd->relocaddr -= gd->mon_len;
+-	gd->relocaddr &= ~(4096 - 1);
++	//gd->relocaddr -= gd->mon_len;
++	//gd->relocaddr &= ~(4096 - 1);
+ #if defined(CONFIG_E500) || defined(CONFIG_MIPS)
+ 	/* round down to next 64 kB limit so that IVPR stays aligned */
+ 	gd->relocaddr &= ~(65536 - 1);
+@@ -410,6 +410,7 @@
+ 	debug("Reserving %ldk for U-Boot at: %08lx\n", gd->mon_len >> 10,
+ 	      gd->relocaddr);
+ 
++	gd->relocaddr = CONFIG_SYS_TEXT_BASE;
+ 	gd->start_addr_sp = gd->relocaddr;
+ 
+ 	return 0;
+@@ -892,19 +893,21 @@
+ 	NULL,
+ };
+ 
+-void board_init_f(ulong boot_flags)
++unsigned int board_init_f(ulong boot_flags)
+ {
+ 	gd->flags = boot_flags;
+ 	gd->have_console = 0;
+ 
+ 	if (initcall_run_list(init_sequence_f))
+ 		hang();
+-
++#if 0
+ #if !defined(CONFIG_ARM) && !defined(CONFIG_SANDBOX) && \
+ 		!defined(CONFIG_EFI_APP) && !CONFIG_IS_ENABLED(X86_64)
+ 	/* NOTREACHED - jump_to_copy() does not return */
+ 	hang();
+ #endif
++#endif
++        return (unsigned int)(gd->new_gd);
+ }
+ 
+ #if defined(CONFIG_X86) || defined(CONFIG_ARC)
+diff -urN u-boot-2018.03/common/board_r.c u-boot-2018.03s/common/board_r.c
+--- u-boot-2018.03/common/board_r.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/common/board_r.c	2019-05-03 00:48:06.910252851 +0800
+@@ -245,6 +245,8 @@
+ #endif
+ 	/* The malloc area is immediately below the monitor copy in DRAM */
+ 	malloc_start = gd->relocaddr - TOTAL_MALLOC_LEN;
++	//debug("gd->relocaddr : %08lx\ngd->malloc_ptr: %08lx\nTOTAL_MALLOC_LEN : %08lx\nmalloc_start : %08lx\n",gd->relocaddr,gd->malloc_ptr,TOTAL_MALLOC_LEN,malloc_start);
++	debug("gd->relocaddr : %08lx\nTOTAL_MALLOC_LEN : %08lx\nmalloc_start : %08lx\n",gd->relocaddr,TOTAL_MALLOC_LEN,malloc_start);
+ 	mem_malloc_init((ulong)map_sysmem(malloc_start, TOTAL_MALLOC_LEN),
+ 			TOTAL_MALLOC_LEN);
+ 	return 0;
+@@ -349,20 +351,7 @@
+ 		flash_size = flash_init();
+ 
+ 	print_size(flash_size, "");
+-#ifdef CONFIG_SYS_FLASH_CHECKSUM
+-	/*
+-	 * Compute and print flash CRC if flashchecksum is set to 'y'
+-	 *
+-	 * NOTE: Maybe we should add some WATCHDOG_RESET()? XXX
+-	 */
+-	if (env_get_yesno("flashchecksum") == 1) {
+-		const uchar *flash_base = (const uchar *)CONFIG_SYS_FLASH_BASE;
+-
+-		printf("  CRC: %08X", crc32(0,
+-					    flash_base,
+-					    flash_size));
+-	}
+-#endif /* CONFIG_SYS_FLASH_CHECKSUM */
++
+ 	putc('\n');
+ 
+ 	/* update start of FLASH memory    */
+@@ -656,6 +645,7 @@
+ #ifdef CONFIG_SANDBOX
+ 	sandbox_main_loop_init();
+ #endif
++         run_command("mtdparts default",0);
+ 	/* main_loop() can return to retry autoboot, if so just run it again */
+ 	for (;;)
+ 		main_loop();
+diff -urN u-boot-2018.03/configs/jz2440_defconfig u-boot-2018.03s/configs/jz2440_defconfig
+--- u-boot-2018.03/configs/jz2440_defconfig	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/configs/jz2440_defconfig	2019-04-17 23:29:36.000000000 +0800
+@@ -0,0 +1,925 @@
++#
++# Automatically generated file; DO NOT EDIT.
++# U-Boot 2018.03 Configuration
++#
++CONFIG_CREATE_ARCH_SYMLINK=y
++# CONFIG_ARC is not set
++CONFIG_ARM=y
++# CONFIG_M68K is not set
++# CONFIG_MICROBLAZE is not set
++# CONFIG_MIPS is not set
++# CONFIG_NDS32 is not set
++# CONFIG_NIOS2 is not set
++# CONFIG_PPC is not set
++# CONFIG_RISCV is not set
++# CONFIG_SANDBOX is not set
++# CONFIG_SH is not set
++# CONFIG_X86 is not set
++# CONFIG_XTENSA is not set
++CONFIG_SYS_ARCH="arm"
++CONFIG_SYS_CPU="arm920t"
++CONFIG_SYS_SOC="s3c24x0"
++CONFIG_SYS_VENDOR="samsung"
++CONFIG_SYS_BOARD="jz2440"
++CONFIG_SYS_CONFIG_NAME="jz2440"
++
++#
++# ARM architecture
++#
++CONFIG_ARM_ASM_UNIFIED=y
++CONFIG_CPU_ARM920T=y
++CONFIG_SYS_ARM_ARCH=4
++CONFIG_SYS_CACHE_SHIFT_5=y
++CONFIG_SYS_CACHELINE_SIZE=32
++# CONFIG_SEMIHOSTING is not set
++# CONFIG_SYS_THUMB_BUILD is not set
++# CONFIG_SPL_SYS_THUMB_BUILD is not set
++# CONFIG_SYS_L2CACHE_OFF is not set
++# CONFIG_ENABLE_ARM_SOC_BOOT0_HOOK is not set
++# CONFIG_ARM_CORTEX_CPU_IS_UP is not set
++CONFIG_USE_ARCH_MEMCPY=y
++CONFIG_SPL_USE_ARCH_MEMCPY=y
++CONFIG_USE_ARCH_MEMSET=y
++CONFIG_SPL_USE_ARCH_MEMSET=y
++CONFIG_ARM64_SUPPORT_AARCH32=y
++# CONFIG_ARCH_AT91 is not set
++CONFIG_S3C24X0=y
++CONFIG_S3C2440=y
++# CONFIG_S3C2410 is not set
++CONFIG_TARGET_JZ2440=y
++# CONFIG_TARGET_EDB93XX is not set
++# CONFIG_TARGET_ASPENITE is not set
++# CONFIG_TARGET_GPLUGD is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_KIRKWOOD is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_TARGET_DEVKIT3250 is not set
++# CONFIG_TARGET_WORK_92105 is not set
++# CONFIG_TARGET_APF27 is not set
++# CONFIG_ORION5X is not set
++# CONFIG_TARGET_SPEAR300 is not set
++# CONFIG_TARGET_SPEAR310 is not set
++# CONFIG_TARGET_SPEAR320 is not set
++# CONFIG_TARGET_SPEAR600 is not set
++# CONFIG_TARGET_STV0991 is not set
++# CONFIG_TARGET_X600 is not set
++# CONFIG_TARGET_IMX31_PHYCORE is not set
++# CONFIG_TARGET_IMX31_PHYCORE_EET is not set
++# CONFIG_TARGET_MX31ADS is not set
++# CONFIG_TARGET_MX31PDK is not set
++# CONFIG_TARGET_WOODBURN is not set
++# CONFIG_TARGET_WOODBURN_SD is not set
++# CONFIG_TARGET_FLEA3 is not set
++# CONFIG_TARGET_MX35PDK is not set
++# CONFIG_ARCH_BCM283X is not set
++# CONFIG_TARGET_VEXPRESS_CA15_TC2 is not set
++# CONFIG_TARGET_VEXPRESS_CA5X2 is not set
++# CONFIG_TARGET_VEXPRESS_CA9X4 is not set
++# CONFIG_TARGET_BCM23550_W1D is not set
++# CONFIG_TARGET_BCM28155_AP is not set
++# CONFIG_TARGET_BCMCYGNUS is not set
++# CONFIG_TARGET_BCMNSP is not set
++# CONFIG_TARGET_BCMNS2 is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_S5PC1XX is not set
++# CONFIG_ARCH_HIGHBANK is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_KEYSTONE is not set
++# CONFIG_ARCH_OMAP2PLUS is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MX8M is not set
++# CONFIG_ARCH_MX23 is not set
++# CONFIG_ARCH_MX25 is not set
++# CONFIG_ARCH_MX28 is not set
++# CONFIG_ARCH_MX7ULP is not set
++# CONFIG_ARCH_MX7 is not set
++# CONFIG_ARCH_MX6 is not set
++# CONFIG_ARCH_MX5 is not set
++# CONFIG_ARCH_QEMU is not set
++# CONFIG_ARCH_RMOBILE is not set
++# CONFIG_TARGET_S32V234EVB is not set
++# CONFIG_ARCH_SNAPDRAGON is not set
++# CONFIG_ARCH_SOCFPGA is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_VF610 is not set
++# CONFIG_ARCH_ZYNQ is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_TEGRA is not set
++# CONFIG_TARGET_VEXPRESS64_AEMV8A is not set
++# CONFIG_TARGET_VEXPRESS64_BASE_FVP is not set
++# CONFIG_TARGET_VEXPRESS64_BASE_FVP_DRAM is not set
++# CONFIG_TARGET_VEXPRESS64_JUNO is not set
++# CONFIG_TARGET_LS2080A_EMU is not set
++# CONFIG_TARGET_LS2080A_SIMU is not set
++# CONFIG_TARGET_LS1088AQDS is not set
++# CONFIG_TARGET_LS2080AQDS is not set
++# CONFIG_TARGET_LS2080ARDB is not set
++# CONFIG_TARGET_LS2081ARDB is not set
++# CONFIG_TARGET_HIKEY is not set
++# CONFIG_TARGET_POPLAR is not set
++# CONFIG_TARGET_LS1012AQDS is not set
++# CONFIG_TARGET_LS1012ARDB is not set
++# CONFIG_TARGET_LS1012A2G5RDB is not set
++# CONFIG_TARGET_LS1012AFRDM is not set
++# CONFIG_TARGET_LS1088ARDB is not set
++# CONFIG_TARGET_LS1021AQDS is not set
++# CONFIG_TARGET_LS1021ATWR is not set
++# CONFIG_TARGET_LS1021AIOT is not set
++# CONFIG_TARGET_LS1043AQDS is not set
++# CONFIG_TARGET_LS1043ARDB is not set
++# CONFIG_TARGET_LS1046AQDS is not set
++# CONFIG_TARGET_LS1046ARDB is not set
++# CONFIG_TARGET_H2200 is not set
++# CONFIG_TARGET_ZIPITZ2 is not set
++# CONFIG_TARGET_COLIBRI_PXA270 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_STM32 is not set
++# CONFIG_ARCH_STI is not set
++# CONFIG_ARCH_ROCKCHIP is not set
++# CONFIG_TARGET_THUNDERX_88XX is not set
++# CONFIG_ARCH_ASPEED is not set
++CONFIG_SYS_TEXT_BASE=0x33f00000
++CONFIG_SYS_MALLOC_F_LEN=0x400
++CONFIG_IDENT_STRING=""
++# CONFIG_CMD_DEKBLOB is not set
++# CONFIG_CMD_HDMIDETECT is not set
++
++#
++# ARM debug
++#
++# CONFIG_DEBUG_LL is not set
++CONFIG_SMBIOS_PRODUCT_NAME="hikey"
++# CONFIG_DEBUG_UART is not set
++# CONFIG_AHCI is not set
++
++#
++# General setup
++#
++CONFIG_LOCALVERSION=""
++CONFIG_LOCALVERSION_AUTO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_DISTRO_DEFAULTS is not set
++# CONFIG_ENV_VARS_UBOOT_CONFIG is not set
++# CONFIG_SYS_BOOT_GET_CMDLINE is not set
++# CONFIG_SYS_BOOT_GET_KBD is not set
++CONFIG_SYS_MALLOC_F=y
++CONFIG_SPL_SYS_MALLOC_F_LEN=0x400
++CONFIG_TPL_SYS_MALLOC_F_LEN=0x400
++CONFIG_EXPERT=y
++CONFIG_SYS_MALLOC_CLEAR_ON_INIT=y
++# CONFIG_TOOLS_DEBUG is not set
++CONFIG_PHYS_64BIT=y
++
++#
++# Boot images
++#
++# CONFIG_ANDROID_BOOT_IMAGE is not set
++# CONFIG_FIT is not set
++# CONFIG_OF_BOARD_SETUP is not set
++# CONFIG_OF_SYSTEM_SETUP is not set
++# CONFIG_OF_STDOUT_VIA_ALIAS is not set
++CONFIG_SYS_EXTRA_OPTIONS=""
++CONFIG_ARCH_FIXUP_FDT_MEMORY=y
++
++#
++# API
++#
++# CONFIG_API is not set
++
++#
++# Boot timing
++#
++# CONFIG_BOOTSTAGE is not set
++CONFIG_BOOTSTAGE_RECORD_COUNT=30
++CONFIG_SPL_BOOTSTAGE_RECORD_COUNT=5
++CONFIG_BOOTSTAGE_STASH_ADDR=0
++CONFIG_BOOTSTAGE_STASH_SIZE=0x1000
++
++#
++# Boot media
++#
++# CONFIG_NAND_BOOT is not set
++# CONFIG_ONENAND_BOOT is not set
++# CONFIG_QSPI_BOOT is not set
++# CONFIG_SATA_BOOT is not set
++# CONFIG_SD_BOOT is not set
++# CONFIG_SPI_BOOT is not set
++CONFIG_BOOTDELAY=2
++CONFIG_USE_BOOTARGS=y
++CONFIG_BOOTARGS="console=ttySAC0,115200 root/dev/mtdblock3"
++# CONFIG_USE_BOOTCOMMAND is not set
++
++#
++# Console
++#
++# CONFIG_CONSOLE_RECORD is not set
++CONFIG_LOGLEVEL=4
++CONFIG_SPL_LOGLEVEL=4
++# CONFIG_SILENT_CONSOLE is not set
++# CONFIG_PRE_CONSOLE_BUFFER is not set
++# CONFIG_CONSOLE_MUX is not set
++# CONFIG_SYS_CONSOLE_IS_IN_ENV is not set
++# CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE is not set
++# CONFIG_SYS_CONSOLE_ENV_OVERWRITE is not set
++# CONFIG_SYS_CONSOLE_INFO_QUIET is not set
++# CONFIG_SYS_STDIO_DEREGISTER is not set
++
++#
++# Logging
++#
++# CONFIG_LOG is not set
++# CONFIG_SPL_LOG is not set
++# CONFIG_SUPPORT_RAW_INITRD is not set
++CONFIG_DEFAULT_FDT_FILE=""
++# CONFIG_VERSION_VARIABLE is not set
++CONFIG_DISPLAY_CPUINFO=y
++CONFIG_DISPLAY_BOARDINFO=y
++
++#
++# Start-up hooks
++#
++# CONFIG_ARCH_EARLY_INIT_R is not set
++# CONFIG_ARCH_MISC_INIT is not set
++# CONFIG_BOARD_EARLY_INIT_F is not set
++
++#
++# Security support
++#
++CONFIG_HASH=y
++
++#
++# Update support
++#
++
++#
++# SPL / TPL
++#
++
++#
++# Command line interface
++#
++CONFIG_CMDLINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMDLINE_EDITING=y
++CONFIG_AUTO_COMPLETE=y
++CONFIG_SYS_LONGHELP=y
++CONFIG_SYS_PROMPT="=> "
++
++#
++# Autoboot options
++#
++CONFIG_AUTOBOOT=y
++# CONFIG_AUTOBOOT_KEYED is not set
++
++#
++# FASTBOOT
++#
++
++#
++# Commands
++#
++
++#
++# Info commands
++#
++CONFIG_CMD_BDI=y
++# CONFIG_CMD_CONFIG is not set
++CONFIG_CMD_CONSOLE=y
++# CONFIG_CMD_CPU is not set
++# CONFIG_CMD_LICENSE is not set
++
++#
++# Boot commands
++#
++CONFIG_CMD_BOOTD=y
++CONFIG_CMD_BOOTM=y
++# CONFIG_CMD_BOOTZ is not set
++CONFIG_CMD_BOOTEFI=y
++CONFIG_CMD_BOOTEFI_HELLO_COMPILE=y
++# CONFIG_CMD_BOOTEFI_HELLO is not set
++# CONFIG_CMD_BOOTEFI_SELFTEST is not set
++# CONFIG_CMD_BOOTMENU is not set
++CONFIG_CMD_ELF=y
++CONFIG_CMD_FDT=y
++CONFIG_CMD_GO=y
++CONFIG_CMD_RUN=y
++CONFIG_CMD_IMI=y
++CONFIG_CMD_IMLS=y
++CONFIG_CMD_XIMG=y
++# CONFIG_CMD_POWEROFF is not set
++# CONFIG_CMD_FITUPD is not set
++# CONFIG_CMD_THOR_DOWNLOAD is not set
++# CONFIG_CMD_ZBOOT is not set
++
++#
++# Environment commands
++#
++# CONFIG_CMD_ASKENV is not set
++CONFIG_CMD_EXPORTENV=y
++CONFIG_CMD_IMPORTENV=y
++CONFIG_CMD_EDITENV=y
++# CONFIG_CMD_GREPENV is not set
++CONFIG_CMD_SAVEENV=y
++CONFIG_CMD_ENV_EXISTS=y
++# CONFIG_CMD_ENV_CALLBACK is not set
++# CONFIG_CMD_ENV_FLAGS is not set
++
++#
++# Memory commands
++#
++CONFIG_CMD_CRC32=y
++# CONFIG_CRC32_VERIFY is not set
++# CONFIG_CMD_EEPROM is not set
++# CONFIG_LOOPW is not set
++# CONFIG_CMD_MD5SUM is not set
++# CONFIG_CMD_MEMINFO is not set
++CONFIG_CMD_MEMORY=y
++# CONFIG_CMD_MEMTEST is not set
++# CONFIG_CMD_MX_CYCLIC is not set
++# CONFIG_CMD_SHA1SUM is not set
++# CONFIG_CMD_STRINGS is not set
++
++#
++# Compression commands
++#
++CONFIG_CMD_LZMADEC=y
++CONFIG_CMD_UNZIP=y
++# CONFIG_CMD_ZIP is not set
++
++#
++# Device access commands
++#
++# CONFIG_CMD_ARMFLASH is not set
++# CONFIG_CMD_CLK is not set
++# CONFIG_CMD_DEMO is not set
++# CONFIG_CMD_DFU is not set
++CONFIG_CMD_DM=y
++# CONFIG_CMD_FDC is not set
++CONFIG_CMD_FLASH=y
++# CONFIG_CMD_FPGAD is not set
++# CONFIG_CMD_FUSE is not set
++# CONFIG_CMD_GPIO is not set
++# CONFIG_CMD_GPT is not set
++# CONFIG_RANDOM_UUID is not set
++# CONFIG_CMD_IDE is not set
++# CONFIG_CMD_IO is not set
++# CONFIG_CMD_IOTRACE is not set
++# CONFIG_CMD_I2C is not set
++CONFIG_CMD_LOADB=y
++CONFIG_CMD_LOADS=y
++# CONFIG_CMD_MMC is not set
++CONFIG_CMD_NAND=y
++# CONFIG_CMD_NAND_TRIMFFS is not set
++# CONFIG_CMD_NAND_LOCK_UNLOCK is not set
++# CONFIG_CMD_NAND_TORTURE is not set
++# CONFIG_CMD_MMC_SPI is not set
++# CONFIG_CMD_ONENAND is not set
++# CONFIG_CMD_PART is not set
++# CONFIG_CMD_PCI is not set
++# CONFIG_CMD_PCMCIA is not set
++# CONFIG_CMD_READ is not set
++# CONFIG_CMD_SATA is not set
++# CONFIG_CMD_SAVES is not set
++# CONFIG_CMD_SCSI is not set
++# CONFIG_CMD_SDRAM is not set
++# CONFIG_CMD_SF is not set
++# CONFIG_CMD_SF_TEST is not set
++# CONFIG_CMD_SPI is not set
++# CONFIG_CMD_TSI148 is not set
++# CONFIG_CMD_UNIVERSE is not set
++# CONFIG_CMD_USB is not set
++# CONFIG_CMD_USB_SDP is not set
++# CONFIG_CMD_USB_MASS_STORAGE is not set
++
++#
++# Shell scripting commands
++#
++CONFIG_CMD_ECHO=y
++CONFIG_CMD_ITEST=y
++CONFIG_CMD_SOURCE=y
++CONFIG_CMD_SETEXPR=y
++
++#
++# Network commands
++#
++CONFIG_CMD_NET=y
++# CONFIG_CMD_TFTPPUT is not set
++# CONFIG_CMD_TFTPSRV is not set
++# CONFIG_CMD_RARP is not set
++CONFIG_CMD_DHCP=y
++# CONFIG_CMD_PXE is not set
++CONFIG_CMD_NFS=y
++# CONFIG_CMD_MII is not set
++CONFIG_CMD_PING=y
++# CONFIG_CMD_CDP is not set
++# CONFIG_CMD_SNTP is not set
++# CONFIG_CMD_DNS is not set
++# CONFIG_CMD_LINK_LOCAL is not set
++# CONFIG_CMD_ETHSW is not set
++
++#
++# Misc commands
++#
++CONFIG_CMD_BSP=y
++CONFIG_CMD_CACHE=y
++# CONFIG_CMD_DISPLAY is not set
++# CONFIG_CMD_LED is not set
++CONFIG_CMD_DATE=y
++# CONFIG_CMD_TIME is not set
++# CONFIG_CMD_GETTIME is not set
++CONFIG_CMD_MISC=y
++# CONFIG_CMD_TIMER is not set
++# CONFIG_CMD_QFW is not set
++# CONFIG_CMD_TERMINAL is not set
++# CONFIG_CMD_UUID is not set
++
++#
++# TI specific command line interface
++#
++# CONFIG_CMD_DDR3 is not set
++
++#
++# Power commands
++#
++
++#
++# Security commands
++#
++# CONFIG_CMD_AES is not set
++# CONFIG_CMD_BLOB is not set
++# CONFIG_CMD_HASH is not set
++
++#
++# Firmware commands
++#
++
++#
++# Filesystem commands
++#
++# CONFIG_CMD_BTRFS is not set
++# CONFIG_CMD_EXT2 is not set
++# CONFIG_CMD_EXT4 is not set
++# CONFIG_CMD_FAT is not set
++# CONFIG_CMD_FS_GENERIC is not set
++# CONFIG_CMD_FS_UUID is not set
++# CONFIG_CMD_JFFS2 is not set
++CONFIG_CMD_MTDPARTS=y
++CONFIG_MTDIDS_DEFAULT=""
++CONFIG_MTDPARTS_DEFAULT=""
++# CONFIG_CMD_MTDPARTS_SPREAD is not set
++# CONFIG_CMD_REISER is not set
++CONFIG_CMD_YAFFS2=y
++# CONFIG_CMD_ZFS is not set
++
++#
++# Debug commands
++#
++# CONFIG_CMD_BEDBUG is not set
++# CONFIG_CMD_DIAG is not set
++# CONFIG_CMD_KGDB is not set
++# CONFIG_CMD_LOG is not set
++# CONFIG_CMD_TRACE is not set
++# CONFIG_CMD_UBI is not set
++
++#
++# Partition Types
++#
++CONFIG_PARTITIONS=y
++# CONFIG_MAC_PARTITION is not set
++# CONFIG_DOS_PARTITION is not set
++# CONFIG_ISO_PARTITION is not set
++# CONFIG_AMIGA_PARTITION is not set
++# CONFIG_EFI_PARTITION is not set
++# CONFIG_PARTITION_UUIDS is not set
++CONFIG_SUPPORT_OF_CONTROL=y
++
++#
++# Device Tree Control
++#
++# CONFIG_OF_CONTROL is not set
++# CONFIG_OF_BOARD_FIXUP is not set
++# CONFIG_MULTI_DTB_FIT is not set
++CONFIG_MKIMAGE_DTC_PATH=""
++
++#
++# Environment
++#
++# CONFIG_ENV_IS_IN_EEPROM is not set
++# CONFIG_ENV_IS_IN_FAT is not set
++# CONFIG_ENV_IS_IN_EXT4 is not set
++# CONFIG_ENV_IS_IN_FLASH is not set
++# CONFIG_ENV_IS_IN_MMC is not set
++CONFIG_ENV_IS_IN_NAND=y
++# CONFIG_ENV_IS_IN_NVRAM is not set
++# CONFIG_ENV_IS_IN_ONENAND is not set
++# CONFIG_ENV_IS_IN_REMOTE is not set
++# CONFIG_ENV_IS_IN_SPI_FLASH is not set
++# CONFIG_ENV_IS_IN_UBI is not set
++CONFIG_NET=y
++# CONFIG_NET_RANDOM_ETHADDR is not set
++# CONFIG_NETCONSOLE is not set
++CONFIG_NET_TFTP_VARS=y
++# CONFIG_BOOTP_BOOTPATH is not set
++# CONFIG_BOOTP_DNS is not set
++# CONFIG_BOOTP_GATEWAY is not set
++# CONFIG_BOOTP_HOSTNAME is not set
++# CONFIG_BOOTP_PXE is not set
++# CONFIG_BOOTP_SUBNETMASK is not set
++CONFIG_BOOTP_PXE_CLIENTARCH=0x15
++CONFIG_BOOTP_VCI_STRING="U-Boot.arm"
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_DM=y
++CONFIG_DM_WARN=y
++# CONFIG_DM_DEBUG is not set
++CONFIG_DM_DEVICE_REMOVE=y
++CONFIG_DM_STDIO=y
++CONFIG_DM_SEQ_ALIAS=y
++# CONFIG_SPL_DM_SEQ_ALIAS is not set
++# CONFIG_REGMAP is not set
++# CONFIG_DEVRES is not set
++CONFIG_DM_DEV_READ_INLINE=y
++# CONFIG_ADC is not set
++# CONFIG_ADC_EXYNOS is not set
++# CONFIG_ADC_SANDBOX is not set
++# CONFIG_SARADC_ROCKCHIP is not set
++# CONFIG_SATA is not set
++# CONFIG_SCSI_AHCI is not set
++
++#
++# SATA/SCSI device support
++#
++# CONFIG_DWC_AHSATA is not set
++# CONFIG_FSL_SATA is not set
++# CONFIG_MVSATA_IDE is not set
++# CONFIG_SATA_MV is not set
++# CONFIG_SATA_SIL is not set
++# CONFIG_SATA_SIL3114 is not set
++# CONFIG_BLK is not set
++CONFIG_HAVE_BLOCK_DEVICE=y
++# CONFIG_BLOCK_CACHE is not set
++# CONFIG_IDE is not set
++# CONFIG_BOOTCOUNT_LIMIT is not set
++
++#
++# Clock
++#
++# CONFIG_CLK is not set
++# CONFIG_CPU is not set
++
++#
++# Hardware crypto devices
++#
++# CONFIG_FSL_CAAM is not set
++# CONFIG_SYS_FSL_SEC_BE is not set
++# CONFIG_SYS_FSL_SEC_LE is not set
++
++#
++# Demo for driver model
++#
++# CONFIG_DM_DEMO is not set
++
++#
++# DFU support
++#
++
++#
++# DMA Support
++#
++# CONFIG_DMA is not set
++# CONFIG_TI_EDMA3 is not set
++
++#
++# FPGA support
++#
++# CONFIG_FPGA_ALTERA is not set
++# CONFIG_FPGA_SOCFPGA is not set
++# CONFIG_FPGA_XILINX is not set
++# CONFIG_FPGA_SPARTAN3 is not set
++
++#
++# GPIO Support
++#
++CONFIG_DM_GPIO=y
++# CONFIG_ALTERA_PIO is not set
++# CONFIG_DWAPB_GPIO is not set
++# CONFIG_AT91_GPIO is not set
++# CONFIG_ATMEL_PIO4 is not set
++# CONFIG_INTEL_BROADWELL_GPIO is not set
++# CONFIG_INTEL_ICH6_GPIO is not set
++# CONFIG_IMX_RGPIO2P is not set
++# CONFIG_HSDK_CREG_GPIO is not set
++# CONFIG_LPC32XX_GPIO is not set
++# CONFIG_MSM_GPIO is not set
++# CONFIG_MXC_GPIO is not set
++# CONFIG_CMD_PCA953X is not set
++# CONFIG_ROCKCHIP_GPIO is not set
++# CONFIG_XILINX_GPIO is not set
++# CONFIG_CMD_TCA642X is not set
++# CONFIG_TEGRA_GPIO is not set
++# CONFIG_TEGRA186_GPIO is not set
++# CONFIG_VYBRID_GPIO is not set
++# CONFIG_DM_74X164 is not set
++# CONFIG_DM_PCA953X is not set
++# CONFIG_MPC8XXX_GPIO is not set
++
++#
++# I2C support
++#
++# CONFIG_DM_I2C is not set
++# CONFIG_DM_I2C_COMPAT is not set
++# CONFIG_SYS_I2C_DW is not set
++# CONFIG_SYS_I2C_IMX_LPI2C is not set
++# CONFIG_DM_KEYBOARD is not set
++# CONFIG_CROS_EC_KEYB is not set
++
++#
++# LED Support
++#
++# CONFIG_LED is not set
++# CONFIG_LED_STATUS is not set
++
++#
++# Mailbox Controller Support
++#
++
++#
++# Memory Controller drivers
++#
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MISC is not set
++# CONFIG_CROS_EC is not set
++# CONFIG_DS4510 is not set
++# CONFIG_FSL_SEC_MON is not set
++# CONFIG_MXC_OCOTP is not set
++# CONFIG_NUVOTON_NCT6102D is not set
++# CONFIG_PWRSEQ is not set
++# CONFIG_PCA9551_LED is not set
++# CONFIG_WINBOND_W83627 is not set
++CONFIG_ZYNQ_GEM_I2C_MAC_OFFSET=0x0
++
++#
++# MMC Host controller Support
++#
++CONFIG_MMC=y
++CONFIG_MMC_WRITE=y
++# CONFIG_MMC_BROKEN_CD is not set
++# CONFIG_DM_MMC is not set
++CONFIG_MMC_QUIRKS=y
++CONFIG_MMC_HW_PARTITIONING=y
++# CONFIG_MMC_IO_VOLTAGE is not set
++# CONFIG_SPL_MMC_IO_VOLTAGE is not set
++# CONFIG_MMC_HS200_SUPPORT is not set
++# CONFIG_SPL_MMC_HS200_SUPPORT is not set
++CONFIG_MMC_VERBOSE=y
++# CONFIG_SPL_MMC_TINY is not set
++# CONFIG_MMC_DW is not set
++# CONFIG_MMC_MXC is not set
++# CONFIG_MMC_PCI is not set
++# CONFIG_MMC_OMAP_HS is not set
++# CONFIG_MMC_SDHCI is not set
++# CONFIG_FTSDC010 is not set
++
++#
++# MTD Support
++#
++# CONFIG_MTD is not set
++CONFIG_MTD_NOR_FLASH=y
++CONFIG_NAND=y
++CONFIG_NAND_S3C2440=y
++# CONFIG_NAND_VF610_NFC is not set
++# CONFIG_NAND_PXA3XX is not set
++# CONFIG_NAND_ARASAN is not set
++# CONFIG_NAND_ZYNQ is not set
++
++#
++# Generic NAND options
++#
++
++#
++# SPI Flash Support
++#
++# CONFIG_SPI_FLASH is not set
++
++#
++# UBI support
++#
++# CONFIG_MTD_UBI is not set
++# CONFIG_BITBANGMII is not set
++# CONFIG_MV88E6352_SWITCH is not set
++# CONFIG_PHYLIB is not set
++# CONFIG_DM_ETH is not set
++# CONFIG_NETDEVICES is not set
++# CONFIG_PCI is not set
++
++#
++# PHY Subsystem
++#
++# CONFIG_PHY is not set
++# CONFIG_SPL_PHY is not set
++# CONFIG_MVEBU_COMPHY_SUPPORT is not set
++
++#
++# Pin controllers
++#
++# CONFIG_PINCTRL is not set
++
++#
++# Power
++#
++
++#
++# Power Domain Support
++#
++# CONFIG_DM_PMIC is not set
++# CONFIG_PMIC_AS3722 is not set
++# CONFIG_POWER_MC34VR500 is not set
++# CONFIG_DM_REGULATOR is not set
++# CONFIG_DM_PWM is not set
++# CONFIG_PWM_SANDBOX is not set
++# CONFIG_RAM is not set
++
++#
++# Remote Processor drivers
++#
++
++#
++# Reset Controller Support
++#
++
++#
++# Real Time Clock
++#
++CONFIG_DM_RTC=y
++CONFIG_RTC_S3C24X0=y
++# CONFIG_RTC_PCF2127 is not set
++# CONFIG_RTC_DS1307 is not set
++# CONFIG_RTC_RX8010SJ is not set
++# CONFIG_RTC_S35392A is not set
++# CONFIG_SCSI is not set
++
++#
++# Serial drivers
++#
++CONFIG_BAUDRATE=115200
++# CONFIG_DM_SERIAL is not set
++# CONFIG_DEBUG_UART_SKIP_INIT is not set
++# CONFIG_ATMEL_USART is not set
++# CONFIG_FSL_LPUART is not set
++# CONFIG_MVEBU_A3700_UART is not set
++# CONFIG_NULLDEV_SERIAL is not set
++# CONFIG_SYS_NS16550 is not set
++# CONFIG_PL010_SERIAL is not set
++# CONFIG_PL011_SERIAL is not set
++CONFIG_S3C24X0_SERIAL=y
++# CONFIG_PXA_SERIAL is not set
++
++#
++# Sound support
++#
++# CONFIG_SOUND is not set
++
++#
++# SPI Support
++#
++# CONFIG_DM_SPI is not set
++# CONFIG_SOFT_SPI is not set
++# CONFIG_CF_SPI is not set
++# CONFIG_FSL_ESPI is not set
++# CONFIG_FSL_QSPI is not set
++# CONFIG_ATCSPI200_SPI is not set
++# CONFIG_SH_SPI is not set
++# CONFIG_SH_QSPI is not set
++# CONFIG_TI_QSPI is not set
++# CONFIG_KIRKWOOD_SPI is not set
++# CONFIG_LPC32XX_SSP is not set
++# CONFIG_MPC8XXX_SPI is not set
++# CONFIG_MXC_SPI is not set
++# CONFIG_MXS_SPI is not set
++# CONFIG_OMAP3_SPI is not set
++
++#
++# SPMI support
++#
++# CONFIG_SPMI is not set
++
++#
++# System reset device drivers
++#
++# CONFIG_SYSRESET is not set
++# CONFIG_SYSRESET_SYSCON is not set
++# CONFIG_SYSRESET_WATCHDOG is not set
++# CONFIG_DM_THERMAL is not set
++
++#
++# Timer Support
++#
++# CONFIG_TIMER is not set
++
++#
++# TPM support
++#
++# CONFIG_USB is not set
++
++#
++# Graphics support
++#
++# CONFIG_DM_VIDEO is not set
++# CONFIG_SYS_WHITE_ON_BLACK is not set
++# CONFIG_NO_FB_CLEAR is not set
++
++#
++# TrueType Fonts
++#
++# CONFIG_VIDEO_VESA is not set
++# CONFIG_VIDEO_LCD_ANX9804 is not set
++# CONFIG_VIDEO_LCD_SSD2828 is not set
++# CONFIG_VIDEO_MVEBU is not set
++# CONFIG_DISPLAY is not set
++# CONFIG_VIDEO_BRIDGE is not set
++# CONFIG_VIDEO is not set
++# CONFIG_LCD is not set
++# CONFIG_VIDEO_SIMPLE is not set
++# CONFIG_VIDEO_DT_SIMPLEFB is not set
++
++#
++# Watchdog Timer Support
++#
++# CONFIG_BCM2835_WDT is not set
++# CONFIG_ULP_WATCHDOG is not set
++# CONFIG_WDT is not set
++# CONFIG_PHYS_TO_BUS is not set
++
++#
++# File systems
++#
++# CONFIG_FS_BTRFS is not set
++# CONFIG_FS_CBFS is not set
++# CONFIG_FS_EXT4 is not set
++# CONFIG_FS_FAT is not set
++# CONFIG_FS_JFFS2 is not set
++# CONFIG_FS_CRAMFS is not set
++CONFIG_YAFFS2=y
++
++#
++# Library routines
++#
++# CONFIG_BCH is not set
++# CONFIG_CC_OPTIMIZE_LIBS_FOR_SPEED is not set
++# CONFIG_DYNAMIC_CRC_TABLE is not set
++CONFIG_HAVE_PRIVATE_LIBGCC=y
++CONFIG_LIB_UUID=y
++CONFIG_USE_PRIVATE_LIBGCC=y
++CONFIG_SYS_HZ=1000
++# CONFIG_USE_TINY_PRINTF is not set
++# CONFIG_PANIC_HANG is not set
++CONFIG_REGEX=y
++# CONFIG_SPL_TINY_MEMSET is not set
++# CONFIG_TPL_TINY_MEMSET is not set
++# CONFIG_BITREVERSE is not set
++# CONFIG_CMD_DHRYSTONE is not set
++
++#
++# Security support
++#
++# CONFIG_AES is not set
++# CONFIG_RSA is not set
++# CONFIG_TPM is not set
++
++#
++# Hashing Support
++#
++# CONFIG_SHA1 is not set
++# CONFIG_SHA256 is not set
++# CONFIG_SHA_HW_ACCEL is not set
++
++#
++# Compression Support
++#
++# CONFIG_LZ4 is not set
++CONFIG_LZMA=y
++CONFIG_LZO=y
++# CONFIG_SPL_LZO is not set
++# CONFIG_SPL_GZIP is not set
++# CONFIG_ERRNO_STR is not set
++CONFIG_OF_LIBFDT=y
++# CONFIG_OF_LIBFDT_OVERLAY is not set
++# CONFIG_SPL_OF_LIBFDT is not set
++# CONFIG_FDT_FIXUP_PARTITIONS is not set
++
++#
++# System tables
++#
++CONFIG_GENERATE_SMBIOS_TABLE=y
++CONFIG_SMBIOS_MANUFACTURER="hisilicon"
++CONFIG_EFI_LOADER=y
++# CONFIG_UNIT_TEST is not set
+diff -urN u-boot-2018.03/drivers/mtd/cfi_flash.c u-boot-2018.03s/drivers/mtd/cfi_flash.c
+--- u-boot-2018.03/drivers/mtd/cfi_flash.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/cfi_flash.c	2019-04-16 11:32:07.000000000 +0800
+@@ -2370,16 +2370,6 @@
+ 	unsigned long size = 0;
+ 	int i;
+ 
+-#ifdef CONFIG_SYS_FLASH_PROTECTION
+-	/* read environment from EEPROM */
+-	char s[64];
+-
+-	env_get_f("unlock", s, sizeof(s));
+-#endif
+-
+-#ifdef CONFIG_CFI_FLASH /* for driver model */
+-	cfi_flash_init_dm();
+-#endif
+ 
+ 	/* Init: no FLASHes known */
+ 	for (i = 0; i < CONFIG_SYS_MAX_FLASH_BANKS; ++i) {
+@@ -2400,60 +2390,10 @@
+ 			       flash_info[i].size >> 20);
+ #endif /* CONFIG_SYS_FLASH_QUIET_TEST */
+ 		}
+-#ifdef CONFIG_SYS_FLASH_PROTECTION
+-		else if (strcmp(s, "yes") == 0) {
+-			/*
+-			 * Only the U-Boot image and it's environment
+-			 * is protected, all other sectors are
+-			 * unprotected (unlocked) if flash hardware
+-			 * protection is used (CONFIG_SYS_FLASH_PROTECTION)
+-			 * and the environment variable "unlock" is
+-			 * set to "yes".
+-			 */
+-			if (flash_info[i].legacy_unlock) {
+-				int k;
+-
+-				/*
+-				 * Disable legacy_unlock temporarily,
+-				 * since flash_real_protect would
+-				 * relock all other sectors again
+-				 * otherwise.
+-				 */
+-				flash_info[i].legacy_unlock = 0;
+-
+-				/*
+-				 * Legacy unlocking (e.g. Intel J3) ->
+-				 * unlock only one sector. This will
+-				 * unlock all sectors.
+-				 */
+-				flash_real_protect(&flash_info[i], 0, 0);
+-
+-				flash_info[i].legacy_unlock = 1;
+-
+-				/*
+-				 * Manually mark other sectors as
+-				 * unlocked (unprotected)
+-				 */
+-				for (k = 1; k < flash_info[i].sector_count; k++)
+-					flash_info[i].protect[k] = 0;
+-			} else {
+-				/*
+-				 * No legancy unlocking -> unlock all sectors
+-				 */
+-				flash_protect(FLAG_PROTECT_CLEAR,
+-					      flash_info[i].start[0],
+-					      flash_info[i].start[0]
+-					      + flash_info[i].size - 1,
+-					      &flash_info[i]);
+-			}
+-		}
+-#endif /* CONFIG_SYS_FLASH_PROTECTION */
++
+ 	}
+ 
+ 	flash_protect_default();
+-#ifdef CONFIG_FLASH_CFI_MTD
+-	cfi_mtd_init();
+-#endif
+ 
+ 	return (size);
+ }
+diff -urN u-boot-2018.03/drivers/mtd/jedec_flash.c u-boot-2018.03s/drivers/mtd/jedec_flash.c
+--- u-boot-2018.03/drivers/mtd/jedec_flash.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/jedec_flash.c	2019-04-16 11:32:07.000000000 +0800
+@@ -57,7 +57,7 @@
+ 
+ /* MXIC */
+ #define MX29LV040	0x004F
+-
++#define MX29LV160DB     0x2249
+ /* WINBOND */
+ #define W39L040A	0x00D6
+ 
+@@ -401,6 +401,26 @@
+ 		}
+ 	},
+ #endif
++#ifdef CONFIG_SYS_FLASH_LEGACY_1Mx16 
++	    /* JZ2440使用 */
++	{
++		.mfr_id        = (u16)MX_MANUFACT,        /* 厂家ID */
++		.dev_id        = MX29LV160DB,            /* 设备ID */
++		.name        = "MXIC MX29LV160DB",    /* 芯片名称 */
++		.uaddr        = {                        /* norflash看到的解锁地址，norflash可以像内存一样读，但写必须先解锁 */
++			[1] = MTD_UADDR_0x0555_0x02AA /* x16 */
++		},
++		.DevSize    = SIZE_2MiB,            /* 总空间大小 */
++		.CmdSet        = P_ID_AMD_STD,/* 命令集 */
++		.NumEraseRegions= 4,                /* norflash的擦除块 */
++		.regions    = {
++			ERASEINFO(0x04000, 1),
++			ERASEINFO(0x02000, 2),
++			ERASEINFO(0x08000, 1),
++			ERASEINFO(0x10000, 31),
++		}
++	},    
++#endif
+ };
+ 
+ static inline void fill_info(flash_info_t *info, const struct amd_flash_info *jedec_entry, ulong base)
+diff -urN u-boot-2018.03/drivers/mtd/nand/Kconfig u-boot-2018.03s/drivers/mtd/nand/Kconfig
+--- u-boot-2018.03/drivers/mtd/nand/Kconfig	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/nand/Kconfig	2019-04-16 11:32:07.000000000 +0800
+@@ -40,6 +40,13 @@
+ 	  do ECC calculation (not ECC error detection) for HAM1, BCH4, BCH8
+ 	  and BCH16 ECC algorithms.
+ 
++config NAND_S3C2440
++    bool "Support for S3c2440 Nand Controller"
++    depends on TARGET_JZ2440
++    imply CMD_NAND
++    help 
++      This enables Nand driver support for Nand flash contoller
++      found on S3C2440 Soc.
+ config NAND_OMAP_GPMC_PREFETCH
+ 	bool "Enable GPMC Prefetch"
+ 	depends on NAND_OMAP_GPMC
+diff -urN u-boot-2018.03/drivers/mtd/nand/Makefile u-boot-2018.03s/drivers/mtd/nand/Makefile
+--- u-boot-2018.03/drivers/mtd/nand/Makefile	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/nand/Makefile	2019-04-16 11:32:07.000000000 +0800
+@@ -57,6 +57,7 @@
+ obj-$(CONFIG_NAND_VF610_NFC) += vf610_nfc.o
+ obj-$(CONFIG_NAND_MXC) += mxc_nand.o
+ obj-$(CONFIG_NAND_MXS) += mxs_nand.o
++obj-$(CONFIG_NAND_S3C2440) += s3c2440_nand.o
+ obj-$(CONFIG_NAND_NDFC) += ndfc.o
+ obj-$(CONFIG_NAND_PXA3XX) += pxa3xx_nand.o
+ obj-$(CONFIG_NAND_SPEAR) += spr_nand.o
+diff -urN u-boot-2018.03/drivers/mtd/nand/nand_util.c u-boot-2018.03s/drivers/mtd/nand/nand_util.c
+--- u-boot-2018.03/drivers/mtd/nand/nand_util.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/nand/nand_util.c	2019-04-16 20:29:43.000000000 +0800
+@@ -617,7 +617,7 @@
+ 		return -EFBIG;
+ 	}
+ 
+-	if (!need_skip && !(flags & WITH_DROP_FFS)) {
++	if (!need_skip && !(flags & WITH_DROP_FFS)&& !(flags & WITH_YAFFS_OOB)) {
+ 		rval = nand_write(mtd, offset, length, buffer);
+ 
+ 		if ((flags & WITH_WR_VERIFY) && !rval)
+diff -urN u-boot-2018.03/drivers/mtd/nand/s3c2440_nand.c u-boot-2018.03s/drivers/mtd/nand/s3c2440_nand.c
+--- u-boot-2018.03/drivers/mtd/nand/s3c2440_nand.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/drivers/mtd/nand/s3c2440_nand.c	2019-05-05 23:57:18.299301077 +0800
+@@ -0,0 +1,173 @@
++/*
++ * (C) Copyright 2006 OpenMoko, Inc.
++ * Author: Harald Welte <laforge@openmoko.org>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++#include <common.h>
++
++#include <nand.h>
++#include <asm/arch/s3c24x0_cpu.h>
++#include <asm/io.h>
++
++#define S3C2410_NFCONF_EN          (1<<15)
++#define S3C2410_NFCONF_512BYTE     (1<<14)
++#define S3C2410_NFCONF_4STEP       (1<<13)
++#define S3C2410_NFCONF_INITECC     (1<<12)
++#define S3C2410_NFCONF_nFCE        (1<<11)
++#define S3C2410_NFCONF_TACLS(x)    ((x)<<8)
++#define S3C2410_NFCONF_TWRPH0(x)   ((x)<<4)
++#define S3C2410_NFCONF_TWRPH1(x)   ((x)<<0)
++
++#define S3C2410_ADDR_NALE 4
++#define S3C2410_ADDR_NCLE 8
++
++#ifdef CONFIG_NAND_SPL
++
++/* in the early stage of NAND flash booting, printf() is not available */
++#define printf(fmt, args...)
++
++static void nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
++{
++	int i;
++	struct nand_chip *this = mtd->priv;
++
++	for (i = 0; i < len; i++)
++		buf[i] = readb(this->IO_ADDR_R);
++}
++#endif
++
++
++/*  ctrl : ��ʾ��ʲô, ѡ��оƬ/ȡ��ѡ��, ������Ƿ���ַ
++ * 
++ *  dat  : ����ֵ���ֵַ
++ */
++static void s3c2440_hwcontrol(struct mtd_info *mtd, int dat, unsigned int ctrl)
++{
++	struct s3c2440_nand *nand = s3c2440_get_base_nand();
++
++	if (ctrl & NAND_CLE)
++	{
++		/* ������ */
++		writeb(dat, &nand->nfcmd);
++	}
++	else if(ctrl & NAND_ALE)
++	{
++		/* ����ַ */
++		writeb(dat, &nand->nfaddr);		
++	}
++
++}
++
++static int s3c2440_dev_ready(struct mtd_info *mtd)
++{
++	struct s3c2440_nand *nand = s3c2440_get_base_nand();
++	return readl(&nand->nfstat) & 0x01;
++}
++
++static void s3c2440_nand_select(struct mtd_info *mtd, int chipnr)
++{
++	struct s3c2440_nand *nand = s3c2440_get_base_nand();
++
++	switch (chipnr) {
++	case -1: /* ȡ��ѡ�� */
++		nand->nfcont |= (1<<1);
++		break;
++	case 0:  /* ѡ�� */
++		nand->nfcont &= ~(1<<1);
++		break;
++
++	default:
++		BUG();
++	}
++}
++
++
++int board_nand_init(struct nand_chip *nand)
++{
++	u_int32_t cfg;
++	u_int8_t tacls, twrph0, twrph1;
++	struct s3c24x0_clock_power *clk_power = s3c24x0_get_base_clock_power();
++	struct s3c2440_nand *nand_reg = s3c2440_get_base_nand();
++
++	debug("board_nand_init()\n");
++
++	writel(readl(&clk_power->clkcon) | (1 << 4), &clk_power->clkcon);
++
++	/* initialize hardware */
++#if defined(CONFIG_S3C24XX_CUSTOM_NAND_TIMING)
++	tacls  = CONFIG_S3C24XX_TACLS;
++	twrph0 = CONFIG_S3C24XX_TWRPH0;
++	twrph1 =  CONFIG_S3C24XX_TWRPH1;
++#else
++	tacls  = 4;
++	twrph0 = 8;
++	twrph1 = 8;
++#endif
++
++#if 0
++	cfg = S3C2410_NFCONF_EN;
++	cfg |= S3C2410_NFCONF_TACLS(tacls - 1);
++	cfg |= S3C2410_NFCONF_TWRPH0(twrph0 - 1);
++	cfg |= S3C2410_NFCONF_TWRPH1(twrph1 - 1);
++#endif
++	/* ��ʼ��ʱ�� */
++	cfg = ((tacls-1)<<12)|((twrph0-1)<<8)|((twrph1-1)<<4);
++	writel(cfg, &nand_reg->nfconf);
++
++	/* ʹ��NAND Flash������, ��ʼ��ECC, ��ֹƬѡ */
++	writel((1<<4)|(1<<1)|(1<<0), &nand_reg->nfcont);
++
++
++	/* initialize nand_chip data structure */
++	nand->IO_ADDR_R = (void *)&nand_reg->nfdata;
++	nand->IO_ADDR_W = (void *)&nand_reg->nfdata;
++
++	nand->select_chip = s3c2440_nand_select;
++
++	/* read_buf and write_buf are default */
++	/* read_byte and write_byte are default */
++#ifdef CONFIG_NAND_SPL
++	nand->read_buf = nand_read_buf;
++#endif
++
++	/* hwcontrol always must be implemented */
++	nand->cmd_ctrl = s3c2440_hwcontrol;
++
++	nand->dev_ready = s3c2440_dev_ready;
++
++#ifdef CONFIG_S3C2410_NAND_HWECC
++	nand->ecc.hwctl = s3c2410_nand_enable_hwecc;
++	nand->ecc.calculate = s3c2410_nand_calculate_ecc;
++	nand->ecc.correct = s3c2410_nand_correct_data;
++	nand->ecc.mode = NAND_ECC_HW;
++	nand->ecc.size = CONFIG_SYS_NAND_ECCSIZE;
++	nand->ecc.bytes = CONFIG_SYS_NAND_ECCBYTES;
++#else
++	nand->ecc.mode = NAND_ECC_SOFT;
++#endif
++
++#ifdef CONFIG_S3C2410_NAND_BBT
++	nand->options = NAND_USE_FLASH_BBT;
++#else
++	nand->options = 0;
++#endif
++
++	debug("end of nand_init\n");
++
++	return 0;
++}
+diff -urN u-boot-2018.03/drivers/rtc/Kconfig u-boot-2018.03s/drivers/rtc/Kconfig
+--- u-boot-2018.03/drivers/rtc/Kconfig	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/rtc/Kconfig	2019-04-16 11:32:07.000000000 +0800
+@@ -12,6 +12,10 @@
+ 	  then provides the rtc_get()/rtc_set() interface, delegating to
+ 	  drivers to perform the actual functions. See rtc.h for a
+ 	  description of the API.
++config RTC_S3C24X0
++    bool "Enable S3C24X0 driver"
++    help 
++       enable s3c24x0 driver which provides rtc get and set fucntion.
+ 
+ config RTC_PCF2127
+ 	bool "Enable PCF2127 driver"
+@@ -35,7 +39,6 @@
+ 	depends on DM_RTC
+ 	help
+ 	  Support for Epson RX8010SJ Real Time Clock devices.
+-
+ config RTC_S35392A
+ 	bool "Enable S35392A driver"
+ 	select BITREVERSE
+diff -urN u-boot-2018.03/drivers/serial/Kconfig u-boot-2018.03s/drivers/serial/Kconfig
+--- u-boot-2018.03/drivers/serial/Kconfig	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/serial/Kconfig	2019-04-16 11:32:07.000000000 +0800
+@@ -493,6 +493,11 @@
+ 	help
+ 	  Select this to enable a UART for platforms using PL010 or PL011.
+ 
++config S3C24X0_SERIAL
++    bool "ARM S3C24X0 driver"
++    depends on !DM_SERIAL
++    help
++        select this to enable a uart for platforms using s3c24x0
+ config ROCKCHIP_SERIAL
+ 	bool "Rockchip on-chip UART support"
+ 	depends on DM_SERIAL && SPL_OF_PLATDATA
+diff -urN u-boot-2018.03/drivers/serial/Makefile u-boot-2018.03s/drivers/serial/Makefile
+--- u-boot-2018.03/drivers/serial/Makefile	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/drivers/serial/Makefile	2019-04-16 11:32:07.000000000 +0800
+@@ -51,7 +51,7 @@
+ obj-$(CONFIG_MVEBU_A3700_UART) += serial_mvebu_a3700.o
+ obj-$(CONFIG_MPC8XX_CONS) += serial_mpc8xx.o
+ obj-$(CONFIG_NULLDEV_SERIAL) += serial_nulldev.o
+-
++obj-$(CONFIG_S3C24X0_SERIAL) += serial_s3c24x0.o
+ ifndef CONFIG_SPL_BUILD
+ obj-$(CONFIG_USB_TTY) += usbtty.o
+ endif
+diff -urN u-boot-2018.03/drivers/serial/serial_s3c24x0.c u-boot-2018.03s/drivers/serial/serial_s3c24x0.c
+--- u-boot-2018.03/drivers/serial/serial_s3c24x0.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/drivers/serial/serial_s3c24x0.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,267 @@
++/*
++ * (C) Copyright 2002
++ * Gary Jennejohn, DENX Software Engineering, <garyj@denx.de>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <linux/compiler.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#ifdef CONFIG_SERIAL1
++#define UART_NR	S3C24X0_UART0
++
++#elif defined(CONFIG_SERIAL2)
++#define UART_NR	S3C24X0_UART1
++
++#elif defined(CONFIG_SERIAL3)
++#define UART_NR	S3C24X0_UART2
++
++#else
++#error "Bad: you didn't configure serial ..."
++#endif
++
++#include <asm/io.h>
++#include <serial.h>
++
++/* Multi serial device functions */
++#define DECLARE_S3C_SERIAL_FUNCTIONS(port) \
++	int s3serial##port##_init(void) \
++	{ \
++		return serial_init_dev(port); \
++	} \
++	void s3serial##port##_setbrg(void) \
++	{ \
++		serial_setbrg_dev(port); \
++	} \
++	int s3serial##port##_getc(void) \
++	{ \
++		return serial_getc_dev(port); \
++	} \
++	int s3serial##port##_tstc(void) \
++	{ \
++		return serial_tstc_dev(port); \
++	} \
++	void s3serial##port##_putc(const char c) \
++	{ \
++		serial_putc_dev(port, c); \
++	} \
++	void s3serial##port##_puts(const char *s) \
++	{ \
++		serial_puts_dev(port, s); \
++	}
++
++#define INIT_S3C_SERIAL_STRUCTURE(port, __name) {	\
++	.name	= __name,				\
++	.start	= s3serial##port##_init,		\
++	.stop	= NULL,					\
++	.setbrg	= s3serial##port##_setbrg,		\
++	.getc	= s3serial##port##_getc,		\
++	.tstc	= s3serial##port##_tstc,		\
++	.putc	= s3serial##port##_putc,		\
++	.puts	= s3serial##port##_puts,		\
++}
++
++#ifdef CONFIG_HWFLOW
++static int hwflow;
++#endif
++
++static void _serial_setbrg(const int dev_index)
++{
++	struct s3c24x0_uart *uart = s3c24x0_get_base_uart(dev_index);
++	unsigned int reg = 0;
++	int i;
++
++	/* value is calculated so : (int)(PCLK/16./baudrate) -1 */
++	reg = get_PCLK() / (16 * gd->baudrate) - 1;
++
++	writel(reg, &uart->ubrdiv);
++	for (i = 0; i < 100; i++)
++		/* Delay */ ;
++}
++
++static inline void serial_setbrg_dev(unsigned int dev_index)
++{
++	_serial_setbrg(dev_index);
++}
++
++/* Initialise the serial port. The settings are always 8 data bits, no parity,
++ * 1 stop bit, no start bits.
++ */
++static int serial_init_dev(const int dev_index)
++{
++	struct s3c24x0_uart *uart = s3c24x0_get_base_uart(dev_index);
++
++#ifdef CONFIG_HWFLOW
++	hwflow = 0;	/* turned off by default */
++#endif
++
++	/* FIFO enable, Tx/Rx FIFO clear */
++	writel(0x07, &uart->ufcon);
++	writel(0x0, &uart->umcon);
++
++	/* Normal,No parity,1 stop,8 bit */
++	writel(0x3, &uart->ulcon);
++	/*
++	 * tx=level,rx=edge,disable timeout int.,enable rx error int.,
++	 * normal,interrupt or polling
++	 */
++	writel(0x245, &uart->ucon);
++
++#ifdef CONFIG_HWFLOW
++	writel(0x1, &uart->umcon);	/* rts up */
++#endif
++
++	/* FIXME: This is sooooooooooooooooooo ugly */
++#if defined(CONFIG_ARCH_GTA02_v1) || defined(CONFIG_ARCH_GTA02_v2)
++	/* we need auto hw flow control on the gsm and gps port */
++	if (dev_index == 0 || dev_index == 1)
++		writel(0x10, &uart->umcon);
++#endif
++	_serial_setbrg(dev_index);
++
++	return (0);
++}
++
++/*
++ * Read a single byte from the serial port. Returns 1 on success, 0
++ * otherwise. When the function is succesfull, the character read is
++ * written into its argument c.
++ */
++static int _serial_getc(const int dev_index)
++{
++	struct s3c24x0_uart *uart = s3c24x0_get_base_uart(dev_index);
++
++	while (!(readl(&uart->utrstat) & 0x1))
++		/* wait for character to arrive */ ;
++
++	return readb(&uart->urxh) & 0xff;
++}
++
++static inline int serial_getc_dev(unsigned int dev_index)
++{
++	return _serial_getc(dev_index);
++}
++
++#ifdef CONFIG_HWFLOW
++int hwflow_onoff(int on)
++{
++	switch (on) {
++	case 0:
++	default:
++		break;		/* return current */
++	case 1:
++		hwflow = 1;	/* turn on */
++		break;
++	case -1:
++		hwflow = 0;	/* turn off */
++		break;
++	}
++	return hwflow;
++}
++#endif
++
++#ifdef CONFIG_MODEM_SUPPORT
++static int be_quiet = 0;
++void disable_putc(void)
++{
++	be_quiet = 1;
++}
++
++void enable_putc(void)
++{
++	be_quiet = 0;
++}
++#endif
++
++
++/*
++ * Output a single byte to the serial port.
++ */
++static void _serial_putc(const char c, const int dev_index)
++{
++	struct s3c24x0_uart *uart = s3c24x0_get_base_uart(dev_index);
++#ifdef CONFIG_MODEM_SUPPORT
++	if (be_quiet)
++		return;
++#endif
++
++	while (!(readl(&uart->utrstat) & 0x2))
++		/* wait for room in the tx FIFO */ ;
++
++#ifdef CONFIG_HWFLOW
++	while (hwflow && !(readl(&uart->umstat) & 0x1))
++		/* Wait for CTS up */ ;
++#endif
++
++	writeb(c, &uart->utxh);
++
++	/* If \n, also do \r */
++	if (c == '\n')
++		serial_putc('\r');
++}
++
++static inline void serial_putc_dev(unsigned int dev_index, const char c)
++{
++	_serial_putc(c, dev_index);
++}
++
++/*
++ * Test whether a character is in the RX buffer
++ */
++static int _serial_tstc(const int dev_index)
++{
++	struct s3c24x0_uart *uart = s3c24x0_get_base_uart(dev_index);
++
++	return readl(&uart->utrstat) & 0x1;
++}
++
++static inline int serial_tstc_dev(unsigned int dev_index)
++{
++	return _serial_tstc(dev_index);
++}
++
++static void _serial_puts(const char *s, const int dev_index)
++{
++	while (*s) {
++		_serial_putc(*s++, dev_index);
++	}
++}
++
++static inline void serial_puts_dev(int dev_index, const char *s)
++{
++	_serial_puts(s, dev_index);
++}
++
++DECLARE_S3C_SERIAL_FUNCTIONS(0);
++struct serial_device s3c24xx_serial0_device =
++INIT_S3C_SERIAL_STRUCTURE(0, "s3ser0");
++DECLARE_S3C_SERIAL_FUNCTIONS(1);
++struct serial_device s3c24xx_serial1_device =
++INIT_S3C_SERIAL_STRUCTURE(1, "s3ser1");
++DECLARE_S3C_SERIAL_FUNCTIONS(2);
++struct serial_device s3c24xx_serial2_device =
++INIT_S3C_SERIAL_STRUCTURE(2, "s3ser2");
++
++__weak struct serial_device *default_serial_console(void)
++{
++#if defined(CONFIG_SERIAL1)
++	return &s3c24xx_serial0_device;
++#elif defined(CONFIG_SERIAL2)
++	return &s3c24xx_serial1_device;
++#elif defined(CONFIG_SERIAL3)
++	return &s3c24xx_serial2_device;
++#else
++#error "CONFIG_SERIAL? missing."
++#endif
++}
++
++void s3c24xx_serial_initialize(void)
++{
++	serial_register(&s3c24xx_serial0_device);
++	serial_register(&s3c24xx_serial1_device);
++	serial_register(&s3c24xx_serial2_device);
++}
+diff -urN u-boot-2018.03/env/env.c u-boot-2018.03s/env/env.c
+--- u-boot-2018.03/env/env.c	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/env/env.c	2019-05-05 22:18:23.117612466 +0800
+@@ -101,8 +101,11 @@
+ {
+ 	switch (op) {
+ 	case ENVOP_GET_CHAR:
++		debug("----------------  envop_get_char ----------------");
+ 	case ENVOP_INIT:
++		debug("----------------  envop_init ----------------");
+ 	case ENVOP_LOAD:
++		debug("----------------  envop_load ----------------");
+ 		if (prio >= ARRAY_SIZE(env_locations))
+ 			return ENVL_UNKNOWN;
+ 
+@@ -110,6 +113,7 @@
+ 		return gd->env_load_location;
+ 
+ 	case ENVOP_SAVE:
++		debug("----------------  envop_save ----------------");
+ 		return gd->env_load_location;
+ 	}
+ 
+@@ -221,7 +225,7 @@
+ 	struct env_driver *drv;
+ 	int ret = -ENOENT;
+ 	int prio;
+-
++        
+ 	for (prio = 0; (drv = env_driver_lookup(ENVOP_INIT, prio)); prio++) {
+ 		if (!drv->init || !(ret = drv->init()))
+ 			env_set_inited(drv->location);
+@@ -237,8 +241,10 @@
+ 		gd->env_addr = (ulong)&default_environment[0];
+ 		gd->env_valid = ENV_VALID;
+ 
++	        debug("----------------------    gd->env_addr  %08lx-----------------------\n",gd->env_addr);
+ 		return 0;
+ 	}
++        return ret;
++
+ 
+-	return ret;
+ }
+diff -urN u-boot-2018.03/fuck.txt u-boot-2018.03s/fuck.txt
+--- u-boot-2018.03/fuck.txt	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/fuck.txt	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1,648 @@
++  CHK     include/config/uboot.release
++  CHK     include/generated/version_autogenerated.h
++  CHK     include/generated/timestamp_autogenerated.h
++  UPD     include/generated/timestamp_autogenerated.h
++  HOSTCC  scripts/basic/fixdep
++  CC      lib/asm-offsets.s
++  CHK     include/generated/generic-asm-offsets.h
++  CC      arch/arm/lib/asm-offsets.s
++  CHK     include/generated/asm-offsets.h
++  HOSTCC  tools/envcrc.o
++  WRAP    tools/lib/crc32.c
++  HOSTCC  tools/lib/crc32.o
++  HOSTCC  tools/env/embedded.o
++  WRAP    tools/lib/sha1.c
++  HOSTCC  tools/lib/sha1.o
++  HOSTLD  tools/envcrc
++  HOSTCC  tools/gen_eth_addr
++  HOSTCC  tools/gen_ethaddr_crc.o
++  WRAP    tools/lib/crc8.c
++  HOSTCC  tools/lib/crc8.o
++  HOSTLD  tools/gen_ethaddr_crc
++  HOSTCC  tools/img2srec
++  HOSTCC  tools/mkenvimage.o
++  HOSTCC  tools/os_support.o
++  HOSTLD  tools/mkenvimage
++  HOSTCC  tools/aisimage.o
++  HOSTCC  tools/atmelimage.o
++  WRAP    tools/common/bootm.c
++  HOSTCC  tools/common/bootm.o
++  HOSTCC  tools/default_image.o
++  WRAP    tools/lib/fdtdec_common.c
++  HOSTCC  tools/lib/fdtdec_common.o
++  WRAP    tools/lib/fdtdec.c
++  HOSTCC  tools/lib/fdtdec.o
++  HOSTCC  tools/fit_common.o
++  HOSTCC  tools/fit_image.o
++  WRAP    tools/common/image-fit.c
++  HOSTCC  tools/common/image-fit.o
++  HOSTCC  tools/image-host.o
++  WRAP    tools/common/image.c
++  HOSTCC  tools/common/image.o
++  HOSTCC  tools/imagetool.o
++  HOSTCC  tools/imximage.o
++  HOSTCC  tools/kwbimage.o
++  WRAP    tools/lib/md5.c
++  HOSTCC  tools/lib/md5.o
++  HOSTCC  tools/lpc32xximage.o
++  HOSTCC  tools/mxsimage.o
++  HOSTCC  tools/omapimage.o
++  HOSTCC  tools/pblimage.o
++  HOSTCC  tools/pbl_crc32.o
++  HOSTCC  tools/vybridimage.o
++  WRAP    tools/lib/rc4.c
++  HOSTCC  tools/lib/rc4.o
++  HOSTCC  tools/rkcommon.o
++  HOSTCC  tools/rkimage.o
++  HOSTCC  tools/rksd.o
++  HOSTCC  tools/rkspi.o
++  HOSTCC  tools/socfpgaimage.o
++  WRAP    tools/lib/sha256.c
++  HOSTCC  tools/lib/sha256.o
++  WRAP    tools/common/hash.c
++  HOSTCC  tools/common/hash.o
++  HOSTCC  tools/ublimage.o
++  HOSTCC  tools/zynqimage.o
++  HOSTCC  tools/zynqmpimage.o
++  HOSTCC  tools/libfdt/fdt.o
++  HOSTCC  tools/libfdt/fdt_wip.o
++  HOSTCC  tools/libfdt/fdt_sw.o
++  HOSTCC  tools/libfdt/fdt_rw.o
++  HOSTCC  tools/libfdt/fdt_strerror.o
++  HOSTCC  tools/libfdt/fdt_empty_tree.o
++  HOSTCC  tools/libfdt/fdt_addresses.o
++  HOSTCC  tools/libfdt/fdt_overlay.o
++  WRAP    tools/lib/libfdt/fdt_ro.c
++  HOSTCC  tools/lib/libfdt/fdt_ro.o
++  WRAP    tools/lib/libfdt/fdt_region.c
++  HOSTCC  tools/lib/libfdt/fdt_region.o
++  HOSTCC  tools/gpimage.o
++  HOSTCC  tools/gpimage-common.o
++  HOSTCC  tools/dumpimage.o
++  HOSTLD  tools/dumpimage
++  HOSTCC  tools/mkimage.o
++  HOSTLD  tools/mkimage
++  HOSTCC  tools/proftool
++  HOSTCC  tools/fdtgrep.o
++  HOSTLD  tools/fdtgrep
++  LD      arch/arm/cpu/built-in.o
++  CC      arch/arm/cpu/arm920t/cpu.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/cpu_info.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/speed.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/timer.o
++  LD      arch/arm/cpu/arm920t/s3c24x0/built-in.o
++  LD      arch/arm/cpu/arm920t/built-in.o
++  AS      arch/arm/cpu/arm920t/start.o
++  AS      arch/arm/lib/vectors.o
++  AS      arch/arm/lib/crt0.o
++  AS      arch/arm/lib/setjmp.o
++  AS      arch/arm/lib/relocate.o
++  CC      arch/arm/lib/bootm-fdt.o
++  CC      arch/arm/lib/bootm.o
++  AS      arch/arm/lib/memset.o
++  AS      arch/arm/lib/memcpy.o
++  CC      arch/arm/lib/sections.o
++  CC      arch/arm/lib/stack.o
++  CC      arch/arm/lib/interrupts.o
++  CC      arch/arm/lib/reset.o
++  CC      arch/arm/lib/cache.o
++  CC      arch/arm/lib/cache-cp15.o
++  CC      arch/arm/lib/psci-dt.o
++  LD      arch/arm/lib/built-in.o
++  AS      arch/arm/lib/ashldi3.o
++  AS      arch/arm/lib/ashrdi3.o
++  CC      arch/arm/lib/div0.o
++  AS      arch/arm/lib/div64.o
++  AS      arch/arm/lib/lib1funcs.o
++  AS      arch/arm/lib/lshrdi3.o
++  AS      arch/arm/lib/muldi3.o
++  AS      arch/arm/lib/uldivmod.o
++  AR      arch/arm/lib/lib.a
++  CC      arch/arm/lib/eabi_compat.o
++  AS      arch/arm/lib/crt0_arm_efi.o
++  CC      arch/arm/lib/reloc_arm_efi.o
++  LD      board/samsung/common/built-in.o
++  CC      board/samsung/jz2440/jz2440.o
++  AS      board/samsung/jz2440/lowlevel_init.o
++  LD      board/samsung/jz2440/built-in.o
++  CC      cmd/boot.o
++  CC      cmd/bootm.o
++  CC      cmd/help.o
++  CC      cmd/version.o
++  CC      cmd/blk_common.o
++  CC      cmd/source.o
++  CC      cmd/bdinfo.o
++  CC      cmd/bootefi.o
++  CC      cmd/cache.o
++  CC      cmd/console.o
++  CC      cmd/date.o
++  CC      cmd/echo.o
++  CC      cmd/elf.o
++  CC      cmd/exit.o
++  CC      cmd/ext2.o
++  CC      cmd/fat.o
++  CC      cmd/fdt.o
++  CC      cmd/flash.o
++  CC      cmd/itest.o
++  CC      cmd/load.o
++  CC      cmd/mem.o
++  CC      cmd/misc.o
++  CC      cmd/mtdparts.o
++  CC      cmd/nand.o
++  CC      cmd/net.o
++  CC      cmd/pcmcia.o
++  CC      cmd/reginfo.o
++scripts/Makefile.build:280: recipe for target 'cmd/reginfo.o' failed
++Makefile:1330: recipe for target 'cmd' failed
++  HOSTCC  scripts/basic/fixdep
++  HOSTCC  scripts/kconfig/conf.o
++  HOSTCC  scripts/kconfig/zconf.tab.o
++  HOSTLD  scripts/kconfig/conf
++scripts/kconfig/conf  --silentoldconfig Kconfig
++  CHK     include/config.h
++  CFG     u-boot.cfg
++  GEN     include/autoconf.mk
++  GEN     include/autoconf.mk.dep
++  CHK     include/config/uboot.release
++  CHK     include/generated/version_autogenerated.h
++  CHK     include/generated/timestamp_autogenerated.h
++  UPD     include/generated/timestamp_autogenerated.h
++  CC      lib/asm-offsets.s
++  CHK     include/generated/generic-asm-offsets.h
++  CC      arch/arm/lib/asm-offsets.s
++  CHK     include/generated/asm-offsets.h
++  HOSTCC  tools/envcrc.o
++  WRAP    tools/lib/crc32.c
++  HOSTCC  tools/lib/crc32.o
++  HOSTCC  tools/env/embedded.o
++  WRAP    tools/lib/sha1.c
++  HOSTCC  tools/lib/sha1.o
++  HOSTLD  tools/envcrc
++  HOSTCC  tools/gen_eth_addr
++  HOSTCC  tools/gen_ethaddr_crc.o
++  WRAP    tools/lib/crc8.c
++  HOSTCC  tools/lib/crc8.o
++  HOSTLD  tools/gen_ethaddr_crc
++  HOSTCC  tools/img2srec
++  HOSTCC  tools/mkenvimage.o
++  HOSTCC  tools/os_support.o
++  HOSTLD  tools/mkenvimage
++  HOSTCC  tools/aisimage.o
++  HOSTCC  tools/atmelimage.o
++  WRAP    tools/common/bootm.c
++  HOSTCC  tools/common/bootm.o
++  HOSTCC  tools/default_image.o
++  WRAP    tools/lib/fdtdec_common.c
++  HOSTCC  tools/lib/fdtdec_common.o
++  WRAP    tools/lib/fdtdec.c
++  HOSTCC  tools/lib/fdtdec.o
++  HOSTCC  tools/fit_common.o
++  HOSTCC  tools/fit_image.o
++  WRAP    tools/common/image-fit.c
++  HOSTCC  tools/common/image-fit.o
++  HOSTCC  tools/image-host.o
++  WRAP    tools/common/image.c
++  HOSTCC  tools/common/image.o
++  HOSTCC  tools/imagetool.o
++  HOSTCC  tools/imximage.o
++  HOSTCC  tools/kwbimage.o
++  WRAP    tools/lib/md5.c
++  HOSTCC  tools/lib/md5.o
++  HOSTCC  tools/lpc32xximage.o
++  HOSTCC  tools/mxsimage.o
++  HOSTCC  tools/omapimage.o
++  HOSTCC  tools/pblimage.o
++  HOSTCC  tools/pbl_crc32.o
++  HOSTCC  tools/vybridimage.o
++  WRAP    tools/lib/rc4.c
++  HOSTCC  tools/lib/rc4.o
++  HOSTCC  tools/rkcommon.o
++  HOSTCC  tools/rkimage.o
++  HOSTCC  tools/rksd.o
++  HOSTCC  tools/rkspi.o
++  HOSTCC  tools/socfpgaimage.o
++  WRAP    tools/lib/sha256.c
++  HOSTCC  tools/lib/sha256.o
++  WRAP    tools/common/hash.c
++  HOSTCC  tools/common/hash.o
++  HOSTCC  tools/ublimage.o
++  HOSTCC  tools/zynqimage.o
++  HOSTCC  tools/zynqmpimage.o
++  HOSTCC  tools/libfdt/fdt.o
++  HOSTCC  tools/libfdt/fdt_wip.o
++  HOSTCC  tools/libfdt/fdt_sw.o
++  HOSTCC  tools/libfdt/fdt_rw.o
++  HOSTCC  tools/libfdt/fdt_strerror.o
++  HOSTCC  tools/libfdt/fdt_empty_tree.o
++  HOSTCC  tools/libfdt/fdt_addresses.o
++  HOSTCC  tools/libfdt/fdt_overlay.o
++  WRAP    tools/lib/libfdt/fdt_ro.c
++  HOSTCC  tools/lib/libfdt/fdt_ro.o
++  WRAP    tools/lib/libfdt/fdt_region.c
++  HOSTCC  tools/lib/libfdt/fdt_region.o
++  HOSTCC  tools/gpimage.o
++  HOSTCC  tools/gpimage-common.o
++  HOSTCC  tools/dumpimage.o
++  HOSTLD  tools/dumpimage
++  HOSTCC  tools/mkimage.o
++  HOSTLD  tools/mkimage
++  HOSTCC  tools/proftool
++  HOSTCC  tools/fdtgrep.o
++  HOSTLD  tools/fdtgrep
++  LD      arch/arm/cpu/built-in.o
++  CC      arch/arm/cpu/arm920t/cpu.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/cpu_info.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/speed.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/timer.o
++  LD      arch/arm/cpu/arm920t/s3c24x0/built-in.o
++  LD      arch/arm/cpu/arm920t/built-in.o
++  AS      arch/arm/cpu/arm920t/start.o
++  AS      arch/arm/lib/vectors.o
++  AS      arch/arm/lib/crt0.o
++  AS      arch/arm/lib/setjmp.o
++  AS      arch/arm/lib/relocate.o
++  CC      arch/arm/lib/bootm-fdt.o
++  CC      arch/arm/lib/bootm.o
++  AS      arch/arm/lib/memset.o
++  AS      arch/arm/lib/memcpy.o
++  CC      arch/arm/lib/sections.o
++  CC      arch/arm/lib/stack.o
++  CC      arch/arm/lib/interrupts.o
++  CC      arch/arm/lib/reset.o
++  CC      arch/arm/lib/cache.o
++  CC      arch/arm/lib/cache-cp15.o
++  CC      arch/arm/lib/psci-dt.o
++  LD      arch/arm/lib/built-in.o
++  AS      arch/arm/lib/ashldi3.o
++  AS      arch/arm/lib/ashrdi3.o
++  CC      arch/arm/lib/div0.o
++  AS      arch/arm/lib/div64.o
++  AS      arch/arm/lib/lib1funcs.o
++  AS      arch/arm/lib/lshrdi3.o
++  AS      arch/arm/lib/muldi3.o
++  AS      arch/arm/lib/uldivmod.o
++  AR      arch/arm/lib/lib.a
++  CC      arch/arm/lib/eabi_compat.o
++  AS      arch/arm/lib/crt0_arm_efi.o
++  CC      arch/arm/lib/reloc_arm_efi.o
++  LD      board/samsung/common/built-in.o
++  CC      board/samsung/jz2440/jz2440.o
++  AS      board/samsung/jz2440/lowlevel_init.o
++  LD      board/samsung/jz2440/built-in.o
++  CC      cmd/boot.o
++  CC      cmd/bootm.o
++  CC      cmd/help.o
++  CC      cmd/version.o
++  CC      cmd/blk_common.o
++  CC      cmd/source.o
++  CC      cmd/bdinfo.o
++  CC      cmd/bootefi.o
++  CC      cmd/cache.o
++  CC      cmd/console.o
++  CC      cmd/date.o
++  CC      cmd/echo.o
++  CC      cmd/elf.o
++  CC      cmd/exit.o
++  CC      cmd/ext2.o
++  CC      cmd/fat.o
++  CC      cmd/fdt.o
++  CC      cmd/flash.o
++  CC      cmd/itest.o
++  CC      cmd/load.o
++  CC      cmd/mem.o
++  CC      cmd/misc.o
++  CC      cmd/mtdparts.o
++  CC      cmd/nand.o
++  CC      cmd/net.o
++  CC      cmd/pcmcia.o
++  CC      cmd/reginfo.o
++scripts/Makefile.build:280: recipe for target 'cmd/reginfo.o' failed
++Makefile:1330: recipe for target 'cmd' failed
++  HOSTCC  scripts/basic/fixdep
++  HOSTCC  scripts/kconfig/conf.o
++  HOSTCC  scripts/kconfig/zconf.tab.o
++  HOSTLD  scripts/kconfig/conf
++scripts/kconfig/conf  --silentoldconfig Kconfig
++  CHK     include/config.h
++  CFG     u-boot.cfg
++  GEN     include/autoconf.mk
++  GEN     include/autoconf.mk.dep
++  CHK     include/config/uboot.release
++  CHK     include/generated/version_autogenerated.h
++  CHK     include/generated/timestamp_autogenerated.h
++  UPD     include/generated/timestamp_autogenerated.h
++  CC      lib/asm-offsets.s
++  CHK     include/generated/generic-asm-offsets.h
++  CC      arch/arm/lib/asm-offsets.s
++  CHK     include/generated/asm-offsets.h
++  HOSTCC  tools/envcrc.o
++  WRAP    tools/lib/crc32.c
++  HOSTCC  tools/lib/crc32.o
++  HOSTCC  tools/env/embedded.o
++  WRAP    tools/lib/sha1.c
++  HOSTCC  tools/lib/sha1.o
++  HOSTLD  tools/envcrc
++  HOSTCC  tools/gen_eth_addr
++  HOSTCC  tools/gen_ethaddr_crc.o
++  WRAP    tools/lib/crc8.c
++  HOSTCC  tools/lib/crc8.o
++  HOSTLD  tools/gen_ethaddr_crc
++  HOSTCC  tools/img2srec
++  HOSTCC  tools/mkenvimage.o
++  HOSTCC  tools/os_support.o
++  HOSTLD  tools/mkenvimage
++  HOSTCC  tools/aisimage.o
++  HOSTCC  tools/atmelimage.o
++  WRAP    tools/common/bootm.c
++  HOSTCC  tools/common/bootm.o
++  HOSTCC  tools/default_image.o
++  WRAP    tools/lib/fdtdec_common.c
++  HOSTCC  tools/lib/fdtdec_common.o
++  WRAP    tools/lib/fdtdec.c
++  HOSTCC  tools/lib/fdtdec.o
++  HOSTCC  tools/fit_common.o
++  HOSTCC  tools/fit_image.o
++  WRAP    tools/common/image-fit.c
++  HOSTCC  tools/common/image-fit.o
++  HOSTCC  tools/image-host.o
++  WRAP    tools/common/image.c
++  HOSTCC  tools/common/image.o
++  HOSTCC  tools/imagetool.o
++  HOSTCC  tools/imximage.o
++  HOSTCC  tools/kwbimage.o
++  WRAP    tools/lib/md5.c
++  HOSTCC  tools/lib/md5.o
++  HOSTCC  tools/lpc32xximage.o
++  HOSTCC  tools/mxsimage.o
++  HOSTCC  tools/omapimage.o
++  HOSTCC  tools/pblimage.o
++  HOSTCC  tools/pbl_crc32.o
++  HOSTCC  tools/vybridimage.o
++  WRAP    tools/lib/rc4.c
++  HOSTCC  tools/lib/rc4.o
++  HOSTCC  tools/rkcommon.o
++  HOSTCC  tools/rkimage.o
++  HOSTCC  tools/rksd.o
++  HOSTCC  tools/rkspi.o
++  HOSTCC  tools/socfpgaimage.o
++  WRAP    tools/lib/sha256.c
++  HOSTCC  tools/lib/sha256.o
++  WRAP    tools/common/hash.c
++  HOSTCC  tools/common/hash.o
++  HOSTCC  tools/ublimage.o
++  HOSTCC  tools/zynqimage.o
++  HOSTCC  tools/zynqmpimage.o
++  HOSTCC  tools/libfdt/fdt.o
++  HOSTCC  tools/libfdt/fdt_wip.o
++  HOSTCC  tools/libfdt/fdt_sw.o
++  HOSTCC  tools/libfdt/fdt_rw.o
++  HOSTCC  tools/libfdt/fdt_strerror.o
++  HOSTCC  tools/libfdt/fdt_empty_tree.o
++  HOSTCC  tools/libfdt/fdt_addresses.o
++  HOSTCC  tools/libfdt/fdt_overlay.o
++  WRAP    tools/lib/libfdt/fdt_ro.c
++  HOSTCC  tools/lib/libfdt/fdt_ro.o
++  WRAP    tools/lib/libfdt/fdt_region.c
++  HOSTCC  tools/lib/libfdt/fdt_region.o
++  HOSTCC  tools/gpimage.o
++  HOSTCC  tools/gpimage-common.o
++  HOSTCC  tools/dumpimage.o
++  HOSTLD  tools/dumpimage
++  HOSTCC  tools/mkimage.o
++  HOSTLD  tools/mkimage
++  HOSTCC  tools/proftool
++  HOSTCC  tools/fdtgrep.o
++  HOSTLD  tools/fdtgrep
++  LD      arch/arm/cpu/built-in.o
++  CC      arch/arm/cpu/arm920t/cpu.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/cpu_info.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/speed.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/timer.o
++  LD      arch/arm/cpu/arm920t/s3c24x0/built-in.o
++  LD      arch/arm/cpu/arm920t/built-in.o
++  AS      arch/arm/cpu/arm920t/start.o
++  AS      arch/arm/lib/vectors.o
++  AS      arch/arm/lib/crt0.o
++  AS      arch/arm/lib/setjmp.o
++  AS      arch/arm/lib/relocate.o
++  CC      arch/arm/lib/bootm-fdt.o
++  CC      arch/arm/lib/bootm.o
++  AS      arch/arm/lib/memset.o
++  AS      arch/arm/lib/memcpy.o
++  CC      arch/arm/lib/sections.o
++  CC      arch/arm/lib/stack.o
++  CC      arch/arm/lib/interrupts.o
++  CC      arch/arm/lib/reset.o
++  CC      arch/arm/lib/cache.o
++  CC      arch/arm/lib/cache-cp15.o
++  CC      arch/arm/lib/psci-dt.o
++  LD      arch/arm/lib/built-in.o
++  AS      arch/arm/lib/ashldi3.o
++  AS      arch/arm/lib/ashrdi3.o
++  CC      arch/arm/lib/div0.o
++  AS      arch/arm/lib/div64.o
++  AS      arch/arm/lib/lib1funcs.o
++  AS      arch/arm/lib/lshrdi3.o
++  AS      arch/arm/lib/muldi3.o
++  AS      arch/arm/lib/uldivmod.o
++  AR      arch/arm/lib/lib.a
++  CC      arch/arm/lib/eabi_compat.o
++  AS      arch/arm/lib/crt0_arm_efi.o
++  CC      arch/arm/lib/reloc_arm_efi.o
++  LD      board/samsung/common/built-in.o
++  CC      board/samsung/jz2440/jz2440.o
++  AS      board/samsung/jz2440/lowlevel_init.o
++  LD      board/samsung/jz2440/built-in.o
++  CC      cmd/boot.o
++  CC      cmd/bootm.o
++  CC      cmd/help.o
++  CC      cmd/version.o
++  CC      cmd/blk_common.o
++  CC      cmd/source.o
++  CC      cmd/bdinfo.o
++  CC      cmd/bootefi.o
++  CC      cmd/cache.o
++  CC      cmd/console.o
++  CC      cmd/date.o
++  CC      cmd/echo.o
++  CC      cmd/elf.o
++  CC      cmd/exit.o
++  CC      cmd/ext2.o
++  CC      cmd/fat.o
++  CC      cmd/fdt.o
++  CC      cmd/flash.o
++  CC      cmd/itest.o
++  CC      cmd/load.o
++  CC      cmd/mem.o
++  CC      cmd/misc.o
++  CC      cmd/mtdparts.o
++  CC      cmd/nand.o
++  CC      cmd/net.o
++  CC      cmd/pcmcia.o
++  CC      cmd/reginfo.o
++scripts/Makefile.build:280: recipe for target 'cmd/reginfo.o' failed
++Makefile:1330: recipe for target 'cmd' failed
++  HOSTCC  scripts/basic/fixdep
++  HOSTCC  scripts/kconfig/conf.o
++  HOSTCC  scripts/kconfig/zconf.tab.o
++  HOSTLD  scripts/kconfig/conf
++scripts/kconfig/conf  --silentoldconfig Kconfig
++  CHK     include/config.h
++  CFG     u-boot.cfg
++  GEN     include/autoconf.mk
++  GEN     include/autoconf.mk.dep
++  CHK     include/config/uboot.release
++  CHK     include/generated/version_autogenerated.h
++  CHK     include/generated/timestamp_autogenerated.h
++  UPD     include/generated/timestamp_autogenerated.h
++  CC      lib/asm-offsets.s
++  CHK     include/generated/generic-asm-offsets.h
++  CC      arch/arm/lib/asm-offsets.s
++  CHK     include/generated/asm-offsets.h
++  HOSTCC  tools/envcrc.o
++  WRAP    tools/lib/crc32.c
++  HOSTCC  tools/lib/crc32.o
++  HOSTCC  tools/env/embedded.o
++  WRAP    tools/lib/sha1.c
++  HOSTCC  tools/lib/sha1.o
++  HOSTLD  tools/envcrc
++  HOSTCC  tools/gen_eth_addr
++  HOSTCC  tools/gen_ethaddr_crc.o
++  WRAP    tools/lib/crc8.c
++  HOSTCC  tools/lib/crc8.o
++  HOSTLD  tools/gen_ethaddr_crc
++  HOSTCC  tools/img2srec
++  HOSTCC  tools/mkenvimage.o
++  HOSTCC  tools/os_support.o
++  HOSTLD  tools/mkenvimage
++  HOSTCC  tools/aisimage.o
++  HOSTCC  tools/atmelimage.o
++  WRAP    tools/common/bootm.c
++  HOSTCC  tools/common/bootm.o
++  HOSTCC  tools/default_image.o
++  WRAP    tools/lib/fdtdec_common.c
++  HOSTCC  tools/lib/fdtdec_common.o
++  WRAP    tools/lib/fdtdec.c
++  HOSTCC  tools/lib/fdtdec.o
++  HOSTCC  tools/fit_common.o
++  HOSTCC  tools/fit_image.o
++  WRAP    tools/common/image-fit.c
++  HOSTCC  tools/common/image-fit.o
++  HOSTCC  tools/image-host.o
++  WRAP    tools/common/image.c
++  HOSTCC  tools/common/image.o
++  HOSTCC  tools/imagetool.o
++  HOSTCC  tools/imximage.o
++  HOSTCC  tools/kwbimage.o
++  WRAP    tools/lib/md5.c
++  HOSTCC  tools/lib/md5.o
++  HOSTCC  tools/lpc32xximage.o
++  HOSTCC  tools/mxsimage.o
++  HOSTCC  tools/omapimage.o
++  HOSTCC  tools/pblimage.o
++  HOSTCC  tools/pbl_crc32.o
++  HOSTCC  tools/vybridimage.o
++  WRAP    tools/lib/rc4.c
++  HOSTCC  tools/lib/rc4.o
++  HOSTCC  tools/rkcommon.o
++  HOSTCC  tools/rkimage.o
++  HOSTCC  tools/rksd.o
++  HOSTCC  tools/rkspi.o
++  HOSTCC  tools/socfpgaimage.o
++  WRAP    tools/lib/sha256.c
++  HOSTCC  tools/lib/sha256.o
++  WRAP    tools/common/hash.c
++  HOSTCC  tools/common/hash.o
++  HOSTCC  tools/ublimage.o
++  HOSTCC  tools/zynqimage.o
++  HOSTCC  tools/zynqmpimage.o
++  HOSTCC  tools/libfdt/fdt.o
++  HOSTCC  tools/libfdt/fdt_wip.o
++  HOSTCC  tools/libfdt/fdt_sw.o
++  HOSTCC  tools/libfdt/fdt_rw.o
++  HOSTCC  tools/libfdt/fdt_strerror.o
++  HOSTCC  tools/libfdt/fdt_empty_tree.o
++  HOSTCC  tools/libfdt/fdt_addresses.o
++  HOSTCC  tools/libfdt/fdt_overlay.o
++  WRAP    tools/lib/libfdt/fdt_ro.c
++  HOSTCC  tools/lib/libfdt/fdt_ro.o
++  WRAP    tools/lib/libfdt/fdt_region.c
++  HOSTCC  tools/lib/libfdt/fdt_region.o
++  HOSTCC  tools/gpimage.o
++  HOSTCC  tools/gpimage-common.o
++  HOSTCC  tools/dumpimage.o
++  HOSTLD  tools/dumpimage
++  HOSTCC  tools/mkimage.o
++  HOSTLD  tools/mkimage
++  HOSTCC  tools/proftool
++  HOSTCC  tools/fdtgrep.o
++  HOSTLD  tools/fdtgrep
++  LD      arch/arm/cpu/built-in.o
++  CC      arch/arm/cpu/arm920t/cpu.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/cpu_info.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/speed.o
++  CC      arch/arm/cpu/arm920t/s3c24x0/timer.o
++  LD      arch/arm/cpu/arm920t/s3c24x0/built-in.o
++  LD      arch/arm/cpu/arm920t/built-in.o
++  AS      arch/arm/cpu/arm920t/start.o
++  AS      arch/arm/lib/vectors.o
++  AS      arch/arm/lib/crt0.o
++  AS      arch/arm/lib/setjmp.o
++  AS      arch/arm/lib/relocate.o
++  CC      arch/arm/lib/bootm-fdt.o
++  CC      arch/arm/lib/bootm.o
++  AS      arch/arm/lib/memset.o
++  AS      arch/arm/lib/memcpy.o
++  CC      arch/arm/lib/sections.o
++  CC      arch/arm/lib/stack.o
++  CC      arch/arm/lib/interrupts.o
++  CC      arch/arm/lib/reset.o
++  CC      arch/arm/lib/cache.o
++  CC      arch/arm/lib/cache-cp15.o
++  CC      arch/arm/lib/psci-dt.o
++  LD      arch/arm/lib/built-in.o
++  AS      arch/arm/lib/ashldi3.o
++  AS      arch/arm/lib/ashrdi3.o
++  CC      arch/arm/lib/div0.o
++  AS      arch/arm/lib/div64.o
++  AS      arch/arm/lib/lib1funcs.o
++  AS      arch/arm/lib/lshrdi3.o
++  AS      arch/arm/lib/muldi3.o
++  AS      arch/arm/lib/uldivmod.o
++  AR      arch/arm/lib/lib.a
++  CC      arch/arm/lib/eabi_compat.o
++  AS      arch/arm/lib/crt0_arm_efi.o
++  CC      arch/arm/lib/reloc_arm_efi.o
++  LD      board/samsung/common/built-in.o
++  CC      board/samsung/jz2440/jz2440.o
++  AS      board/samsung/jz2440/lowlevel_init.o
++  LD      board/samsung/jz2440/built-in.o
++  CC      cmd/boot.o
++  CC      cmd/bootm.o
++  CC      cmd/help.o
++  CC      cmd/version.o
++  CC      cmd/blk_common.o
++  CC      cmd/source.o
++  CC      cmd/bdinfo.o
++  CC      cmd/bootefi.o
++  CC      cmd/cache.o
++  CC      cmd/console.o
++  CC      cmd/date.o
++  CC      cmd/echo.o
++  CC      cmd/elf.o
++  CC      cmd/exit.o
++  CC      cmd/ext2.o
++  CC      cmd/fat.o
++  CC      cmd/fdt.o
++  CC      cmd/flash.o
++  CC      cmd/itest.o
++  CC      cmd/load.o
++  CC      cmd/mem.o
++  CC      cmd/misc.o
++  CC      cmd/mtdparts.o
++  CC      cmd/nand.o
++  CC      cmd/net.o
++  CC      cmd/pcmcia.o
++  CC      cmd/reginfo.o
++scripts/Makefile.build:280: recipe for target 'cmd/reginfo.o' failed
++Makefile:1330: recipe for target 'cmd' failed
+diff -urN u-boot-2018.03/include/common.h u-boot-2018.03s/include/common.h
+--- u-boot-2018.03/include/common.h	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/include/common.h	2019-05-05 22:43:33.102730144 +0800
+@@ -14,7 +14,6 @@
+ typedef volatile unsigned long	vu_long;
+ typedef volatile unsigned short vu_short;
+ typedef volatile unsigned char	vu_char;
+-
+ /* Allow sharing constants with type modifiers between C and assembly. */
+ #define _AC(X, Y)       (X##Y)
+ 
+@@ -110,7 +109,7 @@
+ int run_command_list(const char *cmd, int len, int flag);
+ 
+ /* arch/$(ARCH)/lib/board.c */
+-void board_init_f(ulong);
++unsigned int board_init_f(ulong);
+ void board_init_r(gd_t *, ulong) __attribute__ ((noreturn));
+ 
+ /**
+diff -urN u-boot-2018.03/include/configs/jz2440.h u-boot-2018.03s/include/configs/jz2440.h
+--- u-boot-2018.03/include/configs/jz2440.h	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/include/configs/jz2440.h	2019-05-05 22:37:07.719299374 +0800
+@@ -0,0 +1,186 @@
++/*
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Marius Groeger <mgroeger@sysgo.de>
++ * Gary Jennejohn <garyj@denx.de>
++ * David Mueller <d.mueller@elsoft.ch>
++ *
++ * Configuation settings for the SAMSUNG SMDK2410 board.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __JZ2440_H
++#define __JZ2440_H
++
++/*
++ * High Level Configuration Options
++ * (easy to change)
++ */
++/*
++#define CONFIG_S3C24X0		
++#define CONFIG_S3C2440	
++#define CONFIG_SMDK2440	
++*/
++#define CONFIG_DELAY_ENVIRONMENT
++#define CONFIG_SYS_LDSCRIPT "board/samsung/jz2440/u-boot.lds"
++
++#define CONFIG_SYS_ARM_CACHE_WRITETHROUGH
++
++/* input clock of PLL (the SMDK2410 has 12MHz input clock) */
++#define CONFIG_SYS_CLK_FREQ	12000000
++
++#define CONFIG_CMDLINE_TAG	/* enable passing of ATAGs */
++#define CONFIG_SETUP_MEMORY_TAGS
++#define CONFIG_INITRD_TAG
++
++/*
++ * Hardware drivers
++ */
++#if 0
++#define CONFIG_CS8900		/* we have a CS8900 on-board */
++#define CONFIG_CS8900_BASE	0x19000300
++#define CONFIG_CS8900_BUS16	/* the Linux driver does accesses as shorts */
++#else
++#define CONFIG_DRIVER_DM9000
++#define CONFIG_DM9000_BASE   0x20000000
++#define DM9000_IO            CONFIG_DM9000_BASE
++#define DM9000_DATA          (CONFIG_DM9000_BASE + 4)
++
++#endif
++
++/*
++ * select serial console configuration
++ */
++#define CONFIG_SERIAL1		1	/* we use SERIAL 1 on SMDK2410 */
++
++/************************************************************
++ * USB support (currently only works with D-cache off)
++ ************************************************************/
++/*
++#define CONFIG_USB_OHCI
++#define CONFIG_USB_OHCI_S3C24XX
++#define CONFIG_USB_KEYBOARD
++#define CONFIG_USB_STORAGE
++*/
++
++/************************************************************
++ * RTC
++ ************************************************************/
++
++
++
++/*
++ * BOOTP options
++ */
++#define CONFIG_BOOTP_BOOTFILESIZE
++
++/*
++ * Command line configuration.
++ */
++
++
++/* autoboot */
++#define CONFIG_BOOT_RETRY_TIME	-1
++#define CONFIG_RESET_TO_RETRY
++
++#define CONFIG_NETMASK		255.255.255.0
++#define CONFIG_IPADDR		10.0.0.110
++#define CONFIG_SERVERIP		10.0.0.1
++#define CONFIG_ETHADDR          88:D7:F6:22:3E:5B
++
++/*
++ * Miscellaneous configurable options
++ */
++#define CONFIG_SYS_CBSIZE	256
++/* Print Buffer Size */
++#define CONFIG_SYS_PBSIZE	(CONFIG_SYS_CBSIZE + \
++				sizeof(CONFIG_SYS_PROMPT)+16)
++#define CONFIG_SYS_MAXARGS	16
++#define CONFIG_SYS_BARGSIZE	CONFIG_SYS_CBSIZE
++
++
++#define CONFIG_SYS_MEMTEST_START	0x30000000	/* memtest works on */
++#define CONFIG_SYS_MEMTEST_END		0x33F00000	/* 63 MB in DRAM */
++
++#define CONFIG_SYS_LOAD_ADDR		0x30800000
++
++/* support additional compression methods */
++#define CONFIG_BZIP2
++
++/*-----------------------------------------------------------------------
++ * Physical Memory Map
++ */
++#define CONFIG_NR_DRAM_BANKS	1          /* we have 1 bank of DRAM */
++#define PHYS_SDRAM_1		0x30000000 /* SDRAM Bank #1 */
++#define PHYS_SDRAM_1_SIZE	0x04000000 /* 64 MB */
++
++#define PHYS_FLASH_1		0x00000000 /* Flash Bank #0 */
++
++#define CONFIG_SYS_FLASH_BASE	PHYS_FLASH_1
++
++/*-----------------------------------------------------------------------
++ * FLASH and environment organization
++ */
++
++#define CONFIG_SYS_FLASH_CFI
++#define CONFIG_FLASH_CFI_DRIVER
++#define CONFIG_FLASH_CFI_LEGACY
++#define CONFIG_SYS_FLASH_LEGACY_1Mx16
++#define CONFIG_FLASH_SHOW_PROGRESS	45
++
++#define CONFIG_SYS_MAX_FLASH_BANKS	1
++#define CONFIG_SYS_FLASH_BANKS_LIST     { CONFIG_SYS_FLASH_BASE }
++#define CONFIG_SYS_MAX_FLASH_SECT	(128)
++/*
++#define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + 0x070000)
++#define CONFIG_ENV_SIZE			0x10000
++#define CONFIG_ENV_OVERWRITE
++*/
++#define CONFIG_ENV_OFFSET              0x40000
++#define CONFIG_ENV_SIZE                0x20000
++#define CONFIG_ENV_RANGE               0x20000
++
++/*
++ * Size of malloc() pool
++ * BZIP2 / LZO / LZMA need a lot of RAM
++ */
++#define CONFIG_SYS_MALLOC_LEN	(4 * 1024 * 1024)
++
++#define CONFIG_SYS_MONITOR_LEN	(448 * 1024)
++#define CONFIG_SYS_MONITOR_BASE	CONFIG_SYS_FLASH_BASE
++
++/*
++ * NAND configuration
++ */
++#ifdef CONFIG_CMD_NAND
++#define CONFIG_SYS_S3C2440_NAND_HWECC
++#define CONFIG_SYS_MAX_NAND_DEVICE	1
++#define CONFIG_SYS_NAND_BASE		0x4E000000
++#endif
++/*
++MTD
++*/
++#define CONFIG_MTD_DEVICE
++/*
++ * #define MTDIDS_DEFAULT                 "nand0=jz2440-0"
++#define MTDPARTS_DEFAULT               "mtdparts=jz2440-0:256k(u-boot)," \
++                                       "128k(params),"   \
++                                       "2m(kernel),"     \
++                                      "-(rootfs)"        \
++
++*/
++
++
++/*
++ * File system
++ */
++
++/* additions for new relocation code, must be added to all boards */
++#define CONFIG_SYS_SDRAM_BASE	PHYS_SDRAM_1
++#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + 0x1000 - \
++				GENERATED_GBL_DATA_SIZE)
++
++#define CONFIG_BOARD_EARLY_INIT_F
++
++#endif /* __CONFIG_H */
+diff -urN u-boot-2018.03/include/env_default.h u-boot-2018.03s/include/env_default.h
+--- u-boot-2018.03/include/env_default.h	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/include/env_default.h	2019-04-16 11:32:07.000000000 +0800
+@@ -58,6 +58,9 @@
+ #ifdef	CONFIG_SERVERIP
+ 	"serverip="	__stringify(CONFIG_SERVERIP)	"\0"
+ #endif
++#ifdef CONFIG_ETHADDR
++        "ethaddr="      __stringify(CONFIG_ETHADDR)     "\0"
++#endif
+ #ifdef	CONFIG_SYS_AUTOLOAD
+ 	"autoload="	CONFIG_SYS_AUTOLOAD		"\0"
+ #endif
+diff -urN u-boot-2018.03/include/nand.h u-boot-2018.03s/include/nand.h
+--- u-boot-2018.03/include/nand.h	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/include/nand.h	2019-04-16 21:07:22.000000000 +0800
+@@ -10,7 +10,7 @@
+ #define _NAND_H_
+ 
+ #include <config.h>
+-
++#define WITH_YAFFS_OOB    (1 << 0)  
+ /*
+  * All boards using a given driver must convert to self-init
+  * at the same time, so do it here.  When all drivers are
+Binary files u-boot-2018.03/lib/efi_loader/helloworld.efi and u-boot-2018.03s/lib/efi_loader/helloworld.efi differ
+diff -urN u-boot-2018.03/Makefile u-boot-2018.03s/Makefile
+--- u-boot-2018.03/Makefile	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/Makefile	2019-04-16 11:32:07.000000000 +0800
+@@ -857,8 +857,8 @@
+ cfg: u-boot.cfg
+ 
+ quiet_cmd_cfgcheck = CFGCHK  $2
+-cmd_cfgcheck = $(srctree)/scripts/check-config.sh $2 \
+-		$(srctree)/scripts/config_whitelist.txt $(srctree)
++cmd_cfgcheck = #$(srctree)/scripts/check-config.sh $2 \
++	#	$(srctree)/scripts/config_whitelist.txt $(srctree)
+ 
+ all:		$(ALL-y) cfg
+ ifeq ($(CONFIG_DM_I2C_COMPAT)$(CONFIG_SANDBOX),y)
+diff -urN u-boot-2018.03/scripts/config_whitelist.txt u-boot-2018.03s/scripts/config_whitelist.txt
+--- u-boot-2018.03/scripts/config_whitelist.txt	2018-03-13 20:02:19.000000000 +0800
++++ u-boot-2018.03s/scripts/config_whitelist.txt	2019-04-16 11:32:07.000000000 +0800
+@@ -4855,3 +4855,6 @@
+ CONFIG_ZYNQ_SDHCI0
+ CONFIG_ZYNQ_SDHCI1
+ CONFIG_eTSEC_MDIO_BUS
++CONFIG_SYS_FLASH_LEGACY_1Mx16
++CONFIG_SYS_S3C2440_NAND_HWECC
++
+diff -urN u-boot-2018.03/tools/env/embedded.c u-boot-2018.03s/tools/env/embedded.c
+--- u-boot-2018.03/tools/env/embedded.c	1970-01-01 08:00:00.000000000 +0800
++++ u-boot-2018.03s/tools/env/embedded.c	2019-04-16 11:32:07.000000000 +0800
+@@ -0,0 +1 @@
++#include <../env/embedded.c>

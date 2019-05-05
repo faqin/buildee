@@ -1,0 +1,18 @@
+diff -purN boa-0.94.14rc21/docs/jasss boa-0.94.14rc21s/docs/jasss
+--- boa-0.94.14rc21/docs/jasss	1970-01-01 08:00:00.000000000 +0800
++++ boa-0.94.14rc21s/docs/jasss	2019-04-03 12:05:24.246525656 +0800
+@@ -0,0 +1 @@
++asdnnheizja
+diff -purN boa-0.94.14rc21/fuck.txt boa-0.94.14rc21s/fuck.txt
+--- boa-0.94.14rc21/fuck.txt	1970-01-01 08:00:00.000000000 +0800
++++ boa-0.94.14rc21s/fuck.txt	2019-04-03 12:05:03.709853714 +0800
+@@ -0,0 +1 @@
++asdas
+diff -purN boa-0.94.14rc21/README boa-0.94.14rc21s/README
+--- boa-0.94.14rc21/README	2002-03-01 10:56:20.000000000 +0800
++++ boa-0.94.14rc21s/README	2019-04-03 12:05:40.999070539 +0800
+@@ -13,3 +13,4 @@ or visit the Boa homepage at
+ 
+         http://www.boa.org/
+ 
++asdasd
