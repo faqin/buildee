@@ -1,11 +1,8 @@
-#buildee
+# buildee
 
-1. jz2440(100ask.org)
+   ### 1.  jz2440(100ask.org)  
+    configs/jz2440_defconfig
 
-   usage:
 
-     cp configs/jz2440_defconfig ./.config
-
-     make
-
-2. imx6ul(forlinux.com)
+   ### 2. imx6ul(forlinux.com)
+    waiting ...
