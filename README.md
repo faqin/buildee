@@ -4,5 +4,5 @@
     configs/jz2440_defconfig
 
 
-   ### 2. imx6ul(forlinux.com)
+   ### 2. OKMX6UL-C(forlinux.com)
     waiting ...
